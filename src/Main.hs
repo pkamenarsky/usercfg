@@ -1,4 +1,10 @@
+{-# LANGUAGE DataKinds, OverloadedStrings, TypeOperators #-}
+
 module Main where
+
+import           Servant.API
+import           Servant.Server
+import           Web.Users.Types
 
 import qualified Data.Text as T
 
@@ -24,10 +30,17 @@ data Response =
     } deriving (Eq, Show)
 
 data Question =
-  | QuestionYN
+    QuestionYN
   | QuestionOption
     { rspOptions :: [T.Text]
     } deriving (Eq, Show)
 
+f c = do
+  a <- authUser c "asd" "asd" undefined
+  return a
+
+type Api = "push" :> Request :> Post Response
+
 main :: IO ()
-main = print "asd"
+main = do
+  return ()
