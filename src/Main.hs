@@ -1,33 +1,39 @@
-{-# LANGUAGE DataKinds, FlexibleInstances, MultiParamTypeClasses, RecordWildCards, OverloadedStrings, TemplateHaskell, TypeOperators #-}
+{-# LANGUAGE DataKinds, FlexibleInstances, MultiParamTypeClasses, TypeFamilies, RecordWildCards, OverloadedStrings, TemplateHaskell, TypeOperators #-}
 
 module Main where
 
 import           Control.Applicative
+import           Control.Monad.Reader
 
+import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Maybe
+import           Data.Proxy
 
 import           Servant.API
 import           Servant.Server
 import           Web.Users.Types
 
-import qualified Data.Text as T
+import qualified Data.Text              as T
 
+import           Network.Wai.Handler.Warp
+
+import           Command
 import           Model
 
 data Request = Request
   { rqCommand :: T.Text
   , rqOptions :: [(T.Text, T.Text)]
-  }
+  } deriving (Eq, Show)
 
 deriveJSON (opts { fieldLabelModifier     = rmvPrefix "rq"
                  , constructorTagModifier = rmvPrefix ""}) ''Request
 
 data Response =
     Ok
-  | Fail
-    { rspMessage  :: T.Text
-    }
+  | Response Value
+  | Fail T.Text
+    deriving (Eq, Show)
 
 deriveJSON (opts { fieldLabelModifier     = rmvPrefix "rsp"
                  , constructorTagModifier = rmvPrefix ""}) ''Response
@@ -40,68 +46,53 @@ data UserData = UserData
 deriveJSON (opts { fieldLabelModifier     = rmvPrefix "usr"
                  , constructorTagModifier = rmvPrefix ""}) ''UserData
 
-type Api = "user" :> Request :> Post Response
+type Api = "info" :> Get Response
 
-data Option = Option
-  { optName     :: T.Text
-  , optDesc     :: T.Text
-  , optOptional :: Bool
-  }
+api :: Proxy Api
+api = Proxy
 
-data Command opt optLk = Command
-  { cmdName     :: T.Text
-  , cmdOptions  :: opt
-  , cmdFn       :: optLk -> IO ()
-  }
+data BE = BE
 
-cmdCreateUser = Command "create-user"
-  ( Option "name" "User name" False
-  , Option "email" "User mail" False
-  , Option "password" "User password" False
-  , Option "number" "User number" True
-  , Option "ssh-key" "User ssh key" True
-  )
-  cmdCreateUserFn
+instance UserStorageBackend BE where
+  type UserId BE = String
+  createUser bck (User {..}) = return $ Right $ T.unpack $ u_name
 
-cmdCreateUserFn :: (T.Text, T.Text, T.Text, T.Text, T.Text) -> IO ()
-cmdCreateUserFn (name, email, password, number, sshKey) = do
-  print name
-  return ()
+crUser :: UserStorageBackend bck => Command bck (IO Response)
+crUser = cmd "create-user"
+    ( opt    "name" "User name"
+    , opt    "email" "User mail"
+    , opt    "password" "User password"
+    , optMay "number" "User number" Nothing
+    , optMay "ssh-key" "SSH public key" Nothing
+    ) $ \u_name u_email password usrNumber usrSshKey bck -> do
+        createUser bck (User { u_active = True
+                             , u_more   = UserData { .. }
+                             , u_password = makePassword $ PasswordPlain password
+                             , ..
+                             })
+        return Ok
 
-class Exec opt optLk where
-  exec :: [(T.Text, T.Text)] -> Command opt optLk -> IO ()
+cmds :: UserStorageBackend bck => Proxy bck -> [Command bck (IO Response)]
+cmds _ = [ crUser
+         , crUser
+         ]
 
-instance Exec (Option, Option, Option, Option, Option)
-              (T.Text, T.Text, T.Text, T.Text, T.Text) where
-  exec opts (Command {..}) = fromMaybe (return ()) $ do
-    let (a, b, c, d, e) = cmdOptions
+mkProxy :: a -> Proxy a
+mkProxy _ = Proxy
 
-    a' <- lookup (optName a) opts
-    b' <- lookup (optName b) opts
-    c' <- lookup (optName c) opts
-    d' <- lookup (optName d) opts
-    e' <- lookup (optName e) opts
-
-    return $ cmdFn (a', b', c', d', e')
-
-parse :: UserStorageBackend b => b -> Request -> IO Response
-parse b (Request {..}) = undefined
-  where
-    lkp opt = lookup opt rqOptions
-
-    cmd "--create-user" = do
-      u_name     <- lkp "name"
-      u_email    <- lkp "email"
-      u_password <- makePassword . PasswordPlain <$> lkp "password"
-      usrNumber  <- pure <$> lkp "number"
-      usrSshKey  <- pure <$> lkp "ssh-key"
-
-      return $ createUser b (User { u_active = True
-                                  , u_more   = UserData { .. }
-                                  , ..
-                                  })
-
+names :: UserStorageBackend bck => bck -> Keys -> IO [Response]
+names bck opts = mapM (\Command {..} -> maybe (return $ Fail "ERROR") ($ bck) (runReaderT cmdFn opts)) (cmds $ mkProxy bck)
 
 main :: IO ()
 main = do
   return ()
+
+server :: Server Api
+server = info
+  where
+    info = do
+      return $ Response $ toJSON $ cmds (Proxy :: Proxy BE)
+
+runServer :: IO ()
+runServer = do
+  run 8000 $ serve api $ server
