@@ -4,9 +4,10 @@ import Data.Aeson.TH
 import Data.Char
 
 rmvPrefix :: String -> String -> String
-rmvPrefix prf = lower . drop (length prf)
+rmvPrefix prf = hyphenize . lower . drop (length prf)
   where lower []     = []
         lower (c:cs) = toLower c:cs
+        hyphenize = concatMap (\c -> if isUpper c then ['-', toLower c] else [c])
 
 opts :: Options
 opts = Options

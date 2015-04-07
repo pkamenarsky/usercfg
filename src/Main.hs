@@ -31,7 +31,8 @@ deriveJSON (opts { fieldLabelModifier     = rmvPrefix "rsp"
                  , constructorTagModifier = rmvPrefix ""}) ''Response
 
 data UserData = UserData
-  { usrNumber  :: Maybe T.Text
+  { usrNumber :: Maybe T.Text
+  , usrSshKey :: Maybe T.Text
   }
 
 deriveJSON (opts { fieldLabelModifier     = rmvPrefix "usr"
@@ -49,6 +50,7 @@ parse b (Request {..}) = undefined
       u_email    <- lkp "email"
       u_password <- makePassword . PasswordPlain <$> lkp "password"
       usrNumber  <- pure <$> lkp "number"
+      usrSshKey  <- pure <$> lkp "ssh-key"
 
       return $ createUser b (User { u_active = True
                                   , u_more   = UserData { .. }
