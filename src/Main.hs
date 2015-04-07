@@ -56,11 +56,11 @@ data Command opt optLk = Command
   }
 
 cmdCreateUser = Command "create-user"
-  ( Option "name" "User name" False (Nothing :: Maybe T.Text)
-  , Option "email" "User mail" False (Nothing :: Maybe T.Text)
-  , Option "password" "User password" False (Nothing :: Maybe T.Text)
-  , Option "number" "User number" True (Nothing :: Maybe T.Text)
-  , Option "ssh-key" "User ssh key" True (Nothing :: Maybe T.Text)
+  ( Option "name" "User name" False Nothing :: Option T.Text
+  , Option "email" "User mail" False Nothing :: Option T.Text
+  , Option "password" "User password" False Nothing :: Option T.Text
+  , Option "number" "User number" True Nothing :: Option T.Text
+  , Option "ssh-key" "User ssh key" True Nothing :: Option T.Text
   )
   cmdCreateUserFn
 
@@ -71,6 +71,9 @@ cmdCreateUserFn (name, email, password, number, sshKey) = do
 
 class Exec opt optLk where
   exec :: [(T.Text, T.Text)] -> Command opt optLk -> IO ()
+
+lkp :: Read a => [(T.Text, T.Text)] -> Option a -> Maybe a
+lkp opts (Option {..}) = (read . T.unpack) <$> lookup optName opts
 
 instance (Read a, Read b, Read c, Read d, Read e) =>
          Exec (Option a, Option b, Option c, Option d, Option e)
