@@ -1,7 +1,8 @@
-{-# LANGUAGE DataKinds, OverloadedStrings, TemplateHaskell, TypeOperators #-}
+{-# LANGUAGE DataKinds, RecordWildCards, OverloadedStrings, TemplateHaskell, TypeOperators #-}
 
 module Main where
 
+import           Control.Applicative
 import           Data.Aeson.TH
 
 import           Servant.API
@@ -29,11 +30,31 @@ data Response =
 deriveJSON (opts { fieldLabelModifier     = rmvPrefix "rsp"
                  , constructorTagModifier = rmvPrefix ""}) ''Response
 
-f c = do
-  a <- authUser c "asd" "asd" undefined
-  return a
+data UserData = UserData
+  { usrNumber  :: Maybe T.Text
+  }
 
-type Api = "push" :> Request :> Post Response
+deriveJSON (opts { fieldLabelModifier     = rmvPrefix "usr"
+                 , constructorTagModifier = rmvPrefix ""}) ''UserData
+
+type Api = "user" :> Request :> Post Response
+
+parse :: UserStorageBackend b => b -> Request -> IO Response
+parse b (Request {..}) = undefined
+  where
+    lkp opt = lookup opt rqOptions
+
+    cmd "--create-user" = do
+      u_name     <- lkp "name"
+      u_email    <- lkp "email"
+      u_password <- makePassword . PasswordPlain <$> lkp "password"
+      usrNumber  <- pure <$> lkp "number"
+
+      return $ createUser b (User { u_active = True
+                                  , u_more   = UserData { .. }
+                                  , ..
+                                  })
+
 
 main :: IO ()
 main = do
