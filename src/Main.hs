@@ -5,7 +5,6 @@ module Main where
 import           Control.Applicative
 
 import           Data.Aeson.TH
-import           Data.Maybe
 
 import           Servant.API
 import           Servant.Server
@@ -13,6 +12,7 @@ import           Web.Users.Types
 
 import qualified Data.Text as T
 
+import           Command
 import           Model
 
 data Request = Request
@@ -42,52 +42,16 @@ deriveJSON (opts { fieldLabelModifier     = rmvPrefix "usr"
 
 type Api = "user" :> Request :> Post Response
 
-data Option a = Option
-  { optName     :: T.Text
-  , optDesc     :: T.Text
-  , optOptional :: Bool
-  , optDefault  :: Maybe a
-  }
-
-data Command opt optLk = Command
-  { cmdName     :: T.Text
-  , cmdOptions  :: opt
-  , cmdFn       :: optLk -> IO ()
-  }
-
 cmdCreateUser = Command "create-user"
-  ( Option "name" "User name" False Nothing :: Option T.Text
-  , Option "email" "User mail" False Nothing :: Option T.Text
+  ( Option "name" "User name" False Nothing         :: Option T.Text
+  , Option "email" "User mail" False Nothing        :: Option T.Text
   , Option "password" "User password" False Nothing :: Option T.Text
-  , Option "number" "User number" True Nothing :: Option T.Text
-  , Option "ssh-key" "User ssh key" True Nothing :: Option T.Text
+  , Option "number" "User number" True Nothing      :: Option T.Text
+  , Option "ssh-key" "User ssh key" True Nothing    :: Option T.Text
   )
-  cmdCreateUserFn
-
-cmdCreateUserFn :: (T.Text, T.Text, T.Text, T.Text, T.Text) -> IO ()
-cmdCreateUserFn (name, email, password, number, sshKey) = do
-  print name
-  return ()
-
-class Exec opt optLk where
-  exec :: [(T.Text, T.Text)] -> Command opt optLk -> IO ()
-
-lkp :: Read a => [(T.Text, T.Text)] -> Option a -> Maybe a
-lkp opts (Option {..}) = (read . T.unpack) <$> lookup optName opts
-
-instance (Read a, Read b, Read c, Read d, Read e) =>
-         Exec (Option a, Option b, Option c, Option d, Option e)
-         (a, b, c, d, e) where
-  exec opts (Command {..}) = fromMaybe (return ()) $ do
-    let (a, b, c, d, e) = cmdOptions
-
-    a' <- (read . T.unpack) <$> lookup (optName a) opts
-    b' <- (read . T.unpack) <$> lookup (optName b) opts
-    c' <- (read . T.unpack) <$> lookup (optName c) opts
-    d' <- (read . T.unpack) <$> lookup (optName d) opts
-    e' <- (read . T.unpack) <$> lookup (optName e) opts
-
-    return $ cmdFn (a', b', c', d', e')
+  $ \name email password number sshKey -> do
+    print (name :: T.Text)
+    return ()
 
 parse :: UserStorageBackend b => b -> Request -> IO Response
 parse b (Request {..}) = undefined
@@ -105,7 +69,6 @@ parse b (Request {..}) = undefined
                                   , u_more   = UserData { .. }
                                   , ..
                                   })
-
 
 main :: IO ()
 main = do
