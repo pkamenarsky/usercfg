@@ -42,10 +42,11 @@ deriveJSON (opts { fieldLabelModifier     = rmvPrefix "usr"
 
 type Api = "user" :> Request :> Post Response
 
-data Option = Option
+data Option a = Option
   { optName     :: T.Text
   , optDesc     :: T.Text
   , optOptional :: Bool
+  , optDefault  :: Maybe a
   }
 
 data Command opt optLk = Command
@@ -55,11 +56,11 @@ data Command opt optLk = Command
   }
 
 cmdCreateUser = Command "create-user"
-  ( Option "name" "User name" False
-  , Option "email" "User mail" False
-  , Option "password" "User password" False
-  , Option "number" "User number" True
-  , Option "ssh-key" "User ssh key" True
+  ( Option "name" "User name" False (Nothing :: Maybe T.Text)
+  , Option "email" "User mail" False (Nothing :: Maybe T.Text)
+  , Option "password" "User password" False (Nothing :: Maybe T.Text)
+  , Option "number" "User number" True (Nothing :: Maybe T.Text)
+  , Option "ssh-key" "User ssh key" True (Nothing :: Maybe T.Text)
   )
   cmdCreateUserFn
 
@@ -71,16 +72,17 @@ cmdCreateUserFn (name, email, password, number, sshKey) = do
 class Exec opt optLk where
   exec :: [(T.Text, T.Text)] -> Command opt optLk -> IO ()
 
-instance Exec (Option, Option, Option, Option, Option)
-              (T.Text, T.Text, T.Text, T.Text, T.Text) where
+instance (Read a, Read b, Read c, Read d, Read e) =>
+         Exec (Option a, Option b, Option c, Option d, Option e)
+         (a, b, c, d, e) where
   exec opts (Command {..}) = fromMaybe (return ()) $ do
     let (a, b, c, d, e) = cmdOptions
 
-    a' <- lookup (optName a) opts
-    b' <- lookup (optName b) opts
-    c' <- lookup (optName c) opts
-    d' <- lookup (optName d) opts
-    e' <- lookup (optName e) opts
+    a' <- (read . T.unpack) <$> lookup (optName a) opts
+    b' <- (read . T.unpack) <$> lookup (optName b) opts
+    c' <- (read . T.unpack) <$> lookup (optName c) opts
+    d' <- (read . T.unpack) <$> lookup (optName d) opts
+    e' <- (read . T.unpack) <$> lookup (optName e) opts
 
     return $ cmdFn (a', b', c', d', e')
 
