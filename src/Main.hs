@@ -1,6 +1,8 @@
-{-# LANGUAGE DataKinds, OverloadedStrings, TypeOperators #-}
+{-# LANGUAGE DataKinds, OverloadedStrings, TemplateHaskell, TypeOperators #-}
 
 module Main where
+
+import           Data.Aeson.TH
 
 import           Servant.API
 import           Servant.Server
@@ -8,32 +10,24 @@ import           Web.Users.Types
 
 import qualified Data.Text as T
 
-data Request =
-    Request
-    { rqCommand :: T.Text
-    , rqOptions :: [T.Text] -- key-value map?
-    }
-  | RequestCnt
-    { rqToken   :: T.Text
-    , rqAnswer  :: T.Text
-    , rqOptions :: [T.Text]
-    } deriving (Eq, Show)
+import           Model
+
+data Request = Request
+  { rqCommand :: T.Text
+  , rqOptions :: [(T.Text, T.Text)]
+  }
+
+deriveJSON (opts { fieldLabelModifier     = rmvPrefix "rq"
+                 , constructorTagModifier = rmvPrefix ""}) ''Request
 
 data Response =
     Ok
   | Fail
     { rspMessage  :: T.Text
     }
-  | Question
-    { rspQuestion :: Question
-    , rspToken    :: T.Text
-    } deriving (Eq, Show)
 
-data Question =
-    QuestionYN
-  | QuestionOption
-    { rspOptions :: [T.Text]
-    } deriving (Eq, Show)
+deriveJSON (opts { fieldLabelModifier     = rmvPrefix "rsp"
+                 , constructorTagModifier = rmvPrefix ""}) ''Response
 
 f c = do
   a <- authUser c "asd" "asd" undefined
