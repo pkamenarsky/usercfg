@@ -42,7 +42,7 @@ data Option a b = Option
 
 type Keys = [(T.Text, T.Text)]
 
-data Resolve a = Resolve { unRes :: (Keys -> a) } deriving Functor
+data Resolve a = Resolve { unRes :: (Keys -> Maybe a) } deriving Functor
 
 class Read a => Lookupable a b where
   llkup :: Read a => [(T.Text, T.Text)] -> Option a b -> Maybe a
@@ -54,15 +54,15 @@ instance Read a => Lookupable (Maybe a) (Maybe a) where
   llkup opts (Option {..}) = ((read . T.unpack) <$> lookup optName opts) <|> Just optDefault
 
 opt :: Lookupable a b => Option a b -> Resolve a
-opt o = Resolve $ \keys -> fromJust $ llkup keys o
+opt o = Resolve $ \keys -> llkup keys o
 
 instance Applicative Resolve where
-  pure a = Resolve $ const a
-  (Resolve f) <*> (Resolve b) = Resolve $ \keys -> f keys $ b keys
+  pure a = Resolve $ const $ Just a
+  (Resolve f) <*> (Resolve b) = Resolve $ \keys -> f keys <*> b keys
 
 instance Monad Resolve where
   return = pure
-  Resolve a >>= f = Resolve $ \keys -> unRes (f $ a keys) keys
+  Resolve a >>= f = Resolve $ \keys -> join (unRes <$> (f <$> a keys) <*> (Just keys))
 
 type Opt a = Option a ()
 type OptMay a = Option (Maybe a) (Maybe a)
