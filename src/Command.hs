@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, FlexibleInstances, MultiParamTypeClasses, RecordWildCards, TemplateHaskell #-}
+{-# LANGUAGE DeriveFunctor, ExistentialQuantification, FlexibleInstances, MultiParamTypeClasses, RecordWildCards, TemplateHaskell #-}
 
 module Command where
 
@@ -30,12 +30,22 @@ data Response =
 deriveJSON (opts { fieldLabelModifier     = rmvPrefix "rsp"
                  , constructorTagModifier = rmvPrefix ""}) ''Response
 
-
 data Option a b = Option
   { optName     :: T.Text
   , optDesc     :: T.Text
   , optDefault  :: b
   } deriving (Eq, Show)
+
+type Keys = [(T.Text, T.Text)]
+
+data Resolve a = Resolve (Keys -> a) deriving Functor
+
+opt :: Lookupable a b => Option a b -> Resolve a
+opt o = Resolve $ \keys -> fromJust $ llkup keys o
+
+instance Applicative Resolve where
+  pure a = Resolve $ const a
+  (Resolve f) <*> (Resolve b) = Resolve $ \keys -> f keys $ b keys
 
 type Opt a = Option a ()
 type OptMay a = Option (Maybe a) (Maybe a)
