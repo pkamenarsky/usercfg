@@ -30,8 +30,11 @@ data BE = BE
 instance UserStorageBackend BE where
   type UserId BE = String
 
-cmd :: Exec bck a b => Command a b -> (T.Text, bck -> [(T.Text, T.Text)] -> IO Response)
+cmd :: Exec bck a b => Command bck a b -> (T.Text, bck -> [(T.Text, T.Text)] -> IO Response)
 cmd cmd = (cmdName cmd, exec cmd)
+
+cmd' :: opts -> (optsLk -> IO Response) -> ([(T.Text, T.Text)] -> IO Response)
+cmd' opts f = undefined
 
 data Proxy a
 
