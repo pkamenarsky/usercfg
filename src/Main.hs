@@ -43,11 +43,11 @@ deriveJSON (opts { fieldLabelModifier     = rmvPrefix "usr"
 type Api = "user" :> Request :> Post Response
 
 cmdCreateUser = Command "create-user"
-  ( Option "name" "User name" False Nothing         :: Option T.Text
-  , Option "email" "User mail" False Nothing        :: Option T.Text
-  , Option "password" "User password" False Nothing :: Option T.Text
-  , Option "number" "User number" True (Just Nothing)      :: Option (Maybe T.Text)
-  , Option "ssh-key" "User ssh key" True (Just Nothing)    :: Option (Maybe T.Text)
+  ( Option "name" "User name" ()            :: Opt T.Text
+  , Option "email" "User mail" ()           :: Opt T.Text
+  , Option "password" "User password" ()    :: Opt T.Text
+  , Option "number" "User number" Nothing   :: OptMay T.Text
+  , Option "ssh-key" "User ssh key" Nothing :: OptMay T.Text
   )
   cmdCreateUserFn
     where
