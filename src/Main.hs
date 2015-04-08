@@ -3,6 +3,7 @@
 module Main where
 
 import           Control.Applicative
+import           Control.Monad.Reader
 
 import           Data.Aeson.TH
 import           Data.Maybe
@@ -52,7 +53,7 @@ cmds _ = [ ("create-user", crUser)
          ]
 
 names :: UserStorageBackend bck => bck -> Keys -> IO [Response]
-names bck opts = mapM (\(name, cmd) -> maybe (return $ Fail "ERROR") ($ bck) (unRes cmd opts)) (cmds (undefined :: Proxy bck))
+names bck opts = mapM (\(name, cmd) -> maybe (return $ Fail "ERROR") ($ bck) (runReaderT cmd opts)) (cmds (undefined :: Proxy bck))
 
 main :: IO ()
 main = do
