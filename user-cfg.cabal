@@ -21,7 +21,6 @@ executable user-cfg
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8,
                        aeson,
-                       HList,
                        path-pieces,
                        servant,
                        servant-server,
