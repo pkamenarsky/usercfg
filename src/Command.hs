@@ -46,6 +46,9 @@ data Command opt optLk = Command
   , cmdFn       :: UserStorageBackend b => b -> optLk
   }
 
+instance Show (Command a b) where
+  show = show . cmdName
+
 class Lookupable a b where
   llkup :: Read a => [(T.Text, T.Text)] -> Option a b -> Maybe a
 
@@ -56,12 +59,12 @@ instance Lookupable (Maybe a) (Maybe a) where
   llkup opts (Option {..}) = ((read . T.unpack) <$> lookup optName opts) <|> Just optDefault
 
 class Exec bck opt optLk where
-  exec :: bck -> [(T.Text, T.Text)] -> Command opt optLk -> IO Response
+  exec :: Command opt optLk -> bck -> [(T.Text, T.Text)] -> IO Response
 
 instance (Read a, Read b, Read c, Read d, Read e, UserStorageBackend bck,
          Lookupable a d1, Lookupable b d2, Lookupable c d3, Lookupable d d4, Lookupable e d5) =>
          Exec bck (Option a d1, Option b d2, Option c d3, Option d d4, Option e d5)
                   (a -> b -> c -> d -> e -> IO Response) where
-  exec bck os (Command {..}) = fromMaybe (return $ Fail "*** FIXME ERROR") $ do
+  exec (Command {..}) bck os = fromMaybe (return $ Fail "*** FIXME ERROR") $ do
     let (a, b, c, d, e) = cmdOptions
     cmdFn bck <$> llkup os a <*> llkup os b <*> llkup os c <*> llkup os d <*> llkup os e
