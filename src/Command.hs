@@ -3,10 +3,14 @@
 module Command where
 
 import           Control.Applicative
+import           Control.Monad
 
 import           Data.Aeson.TH
 import qualified Data.Text as T
 import           Data.Maybe
+
+import           Data.Tuple.Curry
+import           Data.Tuple.Sequence
 
 import           Web.Users.Types
 import           Web.PathPieces
@@ -47,6 +51,10 @@ instance Applicative Resolve where
   pure a = Resolve $ const a
   (Resolve f) <*> (Resolve b) = Resolve $ \keys -> f keys $ b keys
 
+instance Monad Resolve where
+  return = pure
+  Resolve a >>= f = Resolve $ \keys -> unRes (f $ a keys) keys
+
 type Opt a = Option a ()
 type OptMay a = Option (Maybe a) (Maybe a)
 
@@ -63,6 +71,11 @@ o1 = opt $ Option "name" "Name" ()
 o2 = opt $ Option "pass" "Password" ()
 
 f' = f <$> o1 <*> o2
+
+apply :: (Monad m, SequenceT a (m b), Curry b c)  => a -> (c -> d) -> m d
+apply opts f = do
+  opts' <- sequenceT opts
+  return $ f $ curryN opts'
 
 instance Show (Command bck a b) where
   show = show . cmdName
