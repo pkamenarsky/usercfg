@@ -54,13 +54,13 @@ optMay optName optDesc optDefault' = Option
   , ..
   }
 
-data Command opts bck r = Command
+data Command bck r = forall opts. Command
   { cmdOpts :: opts
-  , cmdFn   :: Resolve (bck -> IO r)
+  , cmdFn   :: Resolve (bck -> r)
   }
 
 apply :: (Monad m, SequenceT a (m b), Curry (b -> c) d)  => a -> d -> m c
 apply opts f = sequenceT opts >>= return . uncurryN f
 
--- cmd :: opts -> bck -> f -> Command opts bck r
+cmd :: (SequenceT opts (Option b), Curry (b -> bck -> r) f) => opts -> f -> Command bck r
 cmd cmdOpts f = Command { cmdFn = optResolve $ apply cmdOpts f, .. }

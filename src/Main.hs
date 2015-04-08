@@ -49,9 +49,10 @@ data BE = BE
 instance UserStorageBackend BE where
   type UserId BE = String
   createUser bck (User {..}) = return $ Right $ T.unpack $ u_name
+
 data Proxy a
 
--- crUser :: UserStorageBackend bck => Command (bck -> IO Response)
+crUser :: UserStorageBackend bck => Command bck (IO Response)
 crUser = cmd
     ( opt    "name" "User name"
     , opt    "email" "User mail"
@@ -66,15 +67,13 @@ crUser = cmd
                              })
         return Ok
 
-{-
-cmds :: UserStorageBackend bck => Proxy bck -> [(String, Resolve (bck -> IO Response))]
-cmds _ = [ ("create-user", crUser)
-         , ("delete-user", crUser)
-         ]
+cmds :: UserStorageBackend bck => [(String, Command bck (IO Response))]
+cmds = [ ("create-user", crUser)
+       , ("delete-user", crUser)
+       ]
 
 names :: UserStorageBackend bck => bck -> Keys -> IO [Response]
-names bck opts = mapM (\(name, cmd) -> maybe (return $ Fail "ERROR") ($ bck) (runReaderT cmd opts)) (cmds (undefined :: Proxy bck))
--}
+names bck opts = mapM (\(name, Command {..}) -> maybe (return $ Fail "ERROR") ($ bck) (runReaderT cmdFn opts)) cmds
 
 main :: IO ()
 main = do
