@@ -38,7 +38,7 @@ data Option a b = Option
 
 type Keys = [(T.Text, T.Text)]
 
-data Resolve a = Resolve (Keys -> a) deriving Functor
+data Resolve a = Resolve { unRes :: (Keys -> a) } deriving Functor
 
 opt :: Lookupable a b => Option a b -> Resolve a
 opt o = Resolve $ \keys -> fromJust $ llkup keys o
@@ -55,6 +55,14 @@ data Command bck opt optLk = Command
   , cmdOptions  :: opt
   , cmdFn       :: bck -> optLk
   }
+
+f :: String -> String -> Int
+f s s' = length s + length s'
+
+o1 = opt $ Option "name" "Name" ()
+o2 = opt $ Option "pass" "Password" ()
+
+f' = f <$> o1 <*> o2
 
 instance Show (Command bck a b) where
   show = show . cmdName
