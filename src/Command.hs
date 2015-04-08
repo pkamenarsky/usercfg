@@ -18,47 +18,49 @@ import           Web.PathPieces
 
 import           Model
 
-data Request = Request
-  { rqCommand :: T.Text
-  , rqOptions :: [(T.Text, T.Text)]
-  } deriving (Eq, Show)
-
-deriveJSON (opts { fieldLabelModifier     = rmvPrefix "rq"
-                 , constructorTagModifier = rmvPrefix ""}) ''Request
-
-data Response =
-    Ok
-  | Fail
-    { rspMessage  :: T.Text
-    } deriving (Eq, Show)
-
-deriveJSON (opts { fieldLabelModifier     = rmvPrefix "rsp"
-                 , constructorTagModifier = rmvPrefix ""}) ''Response
-
-data Option a b = Option
-  { optName     :: T.Text
-  , optDesc     :: T.Text
-  , optDefault  :: b
-  } deriving (Eq, Show)
-
 type Keys = [(T.Text, T.Text)]
 
 type Resolve a = ReaderT Keys Maybe a
 
-class Read a => Lookupable a b where
-  llkup :: Read a => [(T.Text, T.Text)] -> Option a b -> Maybe a
+data Option a = Option
+  { optName     :: T.Text
+  , optDesc     :: T.Text
+  , optDefault  :: Maybe a
+  , optResolve  :: Resolve a
+  } deriving Functor
 
-instance Read a => Lookupable a () where
-  llkup opts (Option {..}) = (read . T.unpack) <$> lookup optName opts
+emptyOption :: Option a
+emptyOption = Option { optName = "", optDesc = "", optDefault = Nothing, optResolve = undefined }
 
-instance Read a => Lookupable (Maybe a) (Maybe a) where
-  llkup opts (Option {..}) = ((read . T.unpack) <$> lookup optName opts) <|> Just optDefault
+instance Applicative Option where
+  pure  = return
+  (<*>) = ap
 
-opt :: Lookupable a b => Option a b -> Resolve a
-opt o = ReaderT $ \keys -> llkup keys o
+instance Monad Option where
+  return x = emptyOption { optResolve = return x }
+  v >>= f  = emptyOption { optResolve = optResolve v >>= (optResolve <$> f) }
 
-type Opt a = Option a ()
-type OptMay a = Option (Maybe a) (Maybe a)
+opt :: Read a => T.Text -> T.Text -> Option a
+opt optName optDesc = Option
+  { optResolve = ReaderT $ \keys -> read . T.unpack <$> lookup optName keys
+  , optDefault = Nothing
+  , ..
+  }
+
+optMay :: Read a => T.Text -> T.Text -> Maybe a -> Option (Maybe a)
+optMay optName optDesc optDefault' = Option
+  { optResolve = ReaderT $ \keys -> (read . T.unpack <$> lookup optName keys) <|> Just optDefault'
+  , optDefault = Just optDefault'
+  , ..
+  }
+
+data Command opts bck r = Command
+  { cmdOpts :: opts
+  , cmdFn   :: Resolve (bck -> IO r)
+  }
 
 apply :: (Monad m, SequenceT a (m b), Curry (b -> c) d)  => a -> d -> m c
 apply opts f = sequenceT opts >>= return . uncurryN f
+
+-- cmd :: opts -> bck -> f -> Command opts bck r
+cmd cmdOpts f = Command { cmdFn = optResolve $ apply cmdOpts f, .. }
