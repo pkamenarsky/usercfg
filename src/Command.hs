@@ -4,7 +4,6 @@ module Command where
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Identity
 import           Control.Monad.Reader
 
 import           Data.Aeson.TH
