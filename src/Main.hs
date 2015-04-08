@@ -46,19 +46,22 @@ cmdCreateUser = Command "create-user"
   ( Option "name" "User name" False Nothing         :: Option T.Text
   , Option "email" "User mail" False Nothing        :: Option T.Text
   , Option "password" "User password" False Nothing :: Option T.Text
-  , Option "number" "User number" True Nothing      :: Option (Maybe T.Text)
-  , Option "ssh-key" "User ssh key" True Nothing    :: Option (Maybe T.Text)
+  , Option "number" "User number" True (Just Nothing)      :: Option (Maybe T.Text)
+  , Option "ssh-key" "User ssh key" True (Just Nothing)    :: Option (Maybe T.Text)
   )
   cmdCreateUserFn
+    where
 
-cmdCreateUserFn :: UserStorageBackend bck => bck -> T.Text -> T.Text -> T.Text -> Maybe T.Text -> Maybe T.Text -> IO (Either CreateUserError (UserId bck))
-cmdCreateUserFn b u_name u_email password usrNumber usrSshKey =
-  createUser b (User { u_active = True
-                     , u_more   = UserData { .. }
-                     , u_password = makePassword $ PasswordPlain password
-                     , ..
-                     })
+      -- cmdCreateUserFn :: UserStorageBackend bck => bck -> T.Text -> T.Text -> T.Text -> Maybe T.Text -> Maybe T.Text -> IO (Either CreateUserError (UserId bck))
+      cmdCreateUserFn b u_name u_email password usrNumber usrSshKey = do
+        createUser b (User { u_active = True
+                           , u_more   = UserData { .. }
+                           , u_password = makePassword $ PasswordPlain password
+                           , ..
+                           })
+        return ()
 
+{-
 parse :: UserStorageBackend b => b -> Request -> IO Response
 parse b (Request {..}) = undefined
   where
@@ -75,6 +78,7 @@ parse b (Request {..}) = undefined
                                   , u_more   = UserData { .. }
                                   , ..
                                   })
+-}
 
 main :: IO ()
 main = do
