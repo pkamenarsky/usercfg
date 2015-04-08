@@ -38,6 +38,19 @@ cmd' opts f = undefined
 
 data Proxy a
 
+crUser :: UserStorageBackend bck => Resolve (bck -> IO Response)
+crUser = apply
+    ( opt $ Option "name" "User name" ()
+    , opt $ Option "email" "User mail" ()
+    , opt $ Option "password" "User password" ()
+    ) $ \u_name u_email password bck -> do
+        createUser bck (User { u_active = True
+                             , u_more   = UserData {}
+                             , u_password = makePassword $ PasswordPlain password
+                             , ..
+                             })
+        return Ok
+
 cmds :: UserStorageBackend bck => Proxy bck -> [(T.Text, bck -> [(T.Text, T.Text)] -> IO Response)]
 cmds _ =
   [ cmd $ Command "create-user"

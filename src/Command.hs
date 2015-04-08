@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, ExistentialQuantification, FlexibleInstances, MultiParamTypeClasses, RecordWildCards, TemplateHaskell #-}
+{-# LANGUAGE DeriveFunctor, ExistentialQuantification, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, RecordWildCards, TemplateHaskell #-}
 
 module Command where
 
@@ -72,10 +72,11 @@ o2 = opt $ Option "pass" "Password" ()
 
 f' = f <$> o1 <*> o2
 
-apply :: (Monad m, SequenceT a (m b), Curry b c)  => a -> (c -> d) -> m d
-apply opts f = do
-  opts' <- sequenceT opts
-  return $ f $ curryN opts'
+apply :: (Monad m, SequenceT a (m b), Curry (b -> c) d)  => a -> d -> m c
+apply opts f = sequenceT opts >>= return . uncurryN f
+
+-- mkCmd :: opts -> (optsLk -> bck -> IO Response) -> (Keys -> IO Response)
+-- mkCmd opts f = apply f optsI
 
 instance Show (Command bck a b) where
   show = show . cmdName
