@@ -17,6 +17,4 @@ for command in data['response']:
   for option in command['options']:
     subparser.add_argument('--' + option['name'], help=option['description'])
 
-args, unknown = parser.parse_known_args()
-
-print(unknown)
+args = parser.parse_args()
