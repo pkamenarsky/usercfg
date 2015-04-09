@@ -21,12 +21,14 @@ executable user-cfg
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8,
                        aeson,
+                       bytestring,
                        mtl,
                        path-pieces,
                        servant,
                        servant-server,
                        text,
                        tuple,
-                       users >= 0.2.0.1
+                       users >= 0.2.0.1,
+                       warp
   hs-source-dirs:      src
   default-language:    Haskell2010

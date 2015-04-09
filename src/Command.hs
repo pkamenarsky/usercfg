@@ -6,7 +6,8 @@ import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Reader
 
-import           Data.Aeson.TH
+import           Data.Aeson
+import           Data.Aeson.Types
 import qualified Data.Text as T
 import           Data.Maybe
 
@@ -28,6 +29,14 @@ data Option a = Option
   , optDefault  :: Maybe a
   , optResolve  :: Resolve a
   } deriving Functor
+
+instance ToJSON a => ToJSON (Option a) where
+  toJSON (Option {..}) = object $
+    [ "name"        .= optName
+    , "description" .= optDesc
+    ] ++ if isJust optDefault
+    then [ "default" .= optDefault ]
+    else []
 
 emptyOption :: Option a
 emptyOption = Option { optName = "", optDesc = "", optDefault = Nothing, optResolve = undefined }
@@ -54,13 +63,20 @@ optMay optName optDesc optDefault' = Option
   , ..
   }
 
-data Command bck r = forall opts. Command
-  { cmdOpts :: opts
+data Command bck r = forall opts. ToJSON opts => Command
+  { cmdName :: T.Text
+  , cmdOpts :: opts
   , cmdFn   :: Resolve (bck -> r)
   }
+
+instance ToJSON (Command bck r) where
+  toJSON (Command {..}) = object
+    [ "name"    .= cmdName
+    , "options" .= cmdOpts
+    ]
 
 apply :: (Monad m, SequenceT a (m b), Curry (b -> c) d)  => a -> d -> m c
 apply opts f = sequenceT opts >>= return . uncurryN f
 
-cmd :: (SequenceT opts (Option b), Curry (b -> bck -> r) f) => opts -> f -> Command bck r
-cmd cmdOpts f = Command { cmdFn = optResolve $ apply cmdOpts f, .. }
+cmd :: (ToJSON opts, SequenceT opts (Option b), Curry (b -> bck -> r) f) => T.Text -> opts -> f -> Command bck r
+cmd cmdName cmdOpts f = Command { cmdFn = optResolve $ apply cmdOpts f, .. }

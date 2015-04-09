@@ -5,14 +5,18 @@ module Main where
 import           Control.Applicative
 import           Control.Monad.Reader
 
+import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Maybe
+import           Data.Proxy
 
 import           Servant.API
 import           Servant.Server
 import           Web.Users.Types
 
-import qualified Data.Text as T
+import qualified Data.Text              as T
+
+import           Network.Wai.Handler.Warp
 
 import           Command
 import           Model
@@ -27,9 +31,9 @@ deriveJSON (opts { fieldLabelModifier     = rmvPrefix "rq"
 
 data Response =
     Ok
-  | Fail
-    { rspMessage  :: T.Text
-    } deriving (Eq, Show)
+  | Response Value
+  | Fail T.Text
+    deriving (Eq, Show)
 
 deriveJSON (opts { fieldLabelModifier     = rmvPrefix "rsp"
                  , constructorTagModifier = rmvPrefix ""}) ''Response
@@ -42,7 +46,10 @@ data UserData = UserData
 deriveJSON (opts { fieldLabelModifier     = rmvPrefix "usr"
                  , constructorTagModifier = rmvPrefix ""}) ''UserData
 
-type Api = "user" :> Request :> Post Response
+type Api = "info" :> Get Response
+
+api :: Proxy Api
+api = Proxy
 
 data BE = BE
 
@@ -50,10 +57,8 @@ instance UserStorageBackend BE where
   type UserId BE = String
   createUser bck (User {..}) = return $ Right $ T.unpack $ u_name
 
-data Proxy a
-
 crUser :: UserStorageBackend bck => Command bck (IO Response)
-crUser = cmd
+crUser = cmd "create-user"
     ( opt    "name" "User name"
     , opt    "email" "User mail"
     , opt    "password" "User password"
@@ -67,14 +72,27 @@ crUser = cmd
                              })
         return Ok
 
-cmds :: UserStorageBackend bck => [(String, Command bck (IO Response))]
-cmds = [ ("create-user", crUser)
-       , ("delete-user", crUser)
-       ]
+cmds :: UserStorageBackend bck => Proxy bck -> [Command bck (IO Response)]
+cmds _ = [ crUser
+         , crUser
+         ]
+
+mkProxy :: a -> Proxy a
+mkProxy _ = Proxy
 
 names :: UserStorageBackend bck => bck -> Keys -> IO [Response]
-names bck opts = mapM (\(name, Command {..}) -> maybe (return $ Fail "ERROR") ($ bck) (runReaderT cmdFn opts)) cmds
+names bck opts = mapM (\Command {..} -> maybe (return $ Fail "ERROR") ($ bck) (runReaderT cmdFn opts)) (cmds $ mkProxy bck)
 
 main :: IO ()
 main = do
   return ()
+
+server :: Server Api
+server = info
+  where
+    info = do
+      return $ Response $ toJSON $ cmds (Proxy :: Proxy BE)
+
+runServer :: IO ()
+runServer = do
+  run 8000 $ serve api $ server
