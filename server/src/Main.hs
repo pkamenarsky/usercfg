@@ -59,7 +59,7 @@ instance UserStorageBackend BE where
 
 cmds :: UserStorageBackend bck => Proxy bck -> [Command bck (IO Response)]
 cmds _ =
-  [ cmd "create-user"
+  [ cmd "create-user" False
     ( opt    "name" "User name"
     , opt    "email" "User mail"
     , opt    "password" "User password"
@@ -72,7 +72,7 @@ cmds _ =
                              , ..
                              })
         return Ok
-  , cmd "delete-user"
+  , cmd "delete-user" True
     ( opt    "name" "User name"
     , opt    "password" "User password"
     ) $ \name password bck -> do
