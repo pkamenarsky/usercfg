@@ -26,6 +26,7 @@ executable user-cfg
                        path-pieces,
                        servant,
                        servant-server,
+                       stripe-haskell,
                        text,
                        tuple,
                        users >= 0.2.0.1,

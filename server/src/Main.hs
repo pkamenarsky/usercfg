@@ -19,6 +19,9 @@ import qualified Data.Text              as T
 
 import           Network.Wai.Handler.Warp
 
+import           Web.Stripe
+import           Web.Stripe.Plan
+
 import           Command
 import           Model
 
@@ -27,10 +30,12 @@ data Error = forall e. ToJSON e => UserStorageBackendError e
            | NoSuchCommandError
 
 instance ToJSON CreateUserError where
-  toJSON _ = A.String "create_user"
+  toJSON UsernameOrEmailAlreadyTaken = A.String "create_user_user_or_email_taken"
+  toJSON InvalidPassword             = A.String "create_user_invalid_password"
 
 instance ToJSON UpdateUserError where
-  toJSON _ = A.String "update_user"
+  toJSON UsernameOrEmailAlreadyExists = A.String "update_user_user_or_email_exists"
+  toJSON UserDoesntExit               = A.String "update_user_user_doesnt_exist"
 
 instance ToJSON TokenError where
   toJSON _ = A.String "token"
@@ -54,11 +59,11 @@ data Response =
   | Fail Error
 
 instance ToJSON Response where
-  toJSON Ok           = object [ "status" .= ("ok" :: T.Text) ]
-  toJSON (Response v) = object [ "status" .= ("ok" :: T.Text)
-                               , "response" .= v ]
-  toJSON (Fail e)     = object [ "status" .= ("error" :: T.Text)
-                               , "error" .= toJSON e ]
+  toJSON Ok           = A.object [ "status" .= ("ok" :: T.Text) ]
+  toJSON (Response v) = A.object [ "status" .= ("ok" :: T.Text)
+                                 , "response" .= v ]
+  toJSON (Fail e)     = A.object [ "status" .= ("error" :: T.Text)
+                                 , "error" .= toJSON e ]
 
 data UserData = UserData
   { usrNumber :: Maybe T.Text
@@ -79,6 +84,14 @@ instance UserStorageBackend BE where
   type UserId BE = String
   createUser bck (User {..}) = return $ Right $ T.unpack $ u_name
 
+class PaymentStorageBackend a
+
+cmdsall :: (UserStorageBackend bck, PaymentStorageBackend bck) => Proxy bck -> [Command bck (IO Response)]
+cmdsall bck = cmds bck ++ cmdsp bck
+
+cmdsp :: PaymentStorageBackend bck => Proxy bck -> [Command bck (IO Response)]
+cmdsp = undefined
+
 cmds :: UserStorageBackend bck => Proxy bck -> [Command bck (IO Response)]
 cmds _ =
   [ cmd "create-user" False
@@ -88,15 +101,15 @@ cmds _ =
     , optMay "number" "User number" Nothing
     , optMay "ssh-key" "SSH public key" Nothing
     ) $ \u_name u_email password usrNumber usrSshKey bck -> do
-        createUser bck (User { u_active = True
-                             , u_more   = UserData { .. }
-                             , u_password = makePassword $ PasswordPlain password
-                             , ..
-                             })
-        return Ok
+        either (return . Fail . UserStorageBackendError) (const $ return Ok) =<<
+          createUser bck (User { u_active = True
+                               , u_more   = UserData { .. }
+                               , u_password = makePassword $ PasswordPlain password
+                               , ..
+                               })
   , cmd "delete-user" True
-    ( opt    "name" "User name"
-    , opt    "password" "User password"
+    ( opt "name" "User name"
+    , opt "password" "User password"
     ) $ \name password bck -> do
         sId <- authUser bck name (PasswordPlain password) 0
         case sId of
@@ -108,6 +121,14 @@ cmds _ =
                 return Ok
               Nothing -> return $ Fail InvalidUserError
           Nothing -> return $ Fail InvalidUserError
+  {-
+  , cmd "add-payment" True
+    ( opt "name" "User name"
+    , opt "password" "User password"
+    , opt "plan"
+    ) $ \name password plan bck -> do
+        return Ok
+  -}
   ]
 
 mkProxy :: a -> Proxy a
