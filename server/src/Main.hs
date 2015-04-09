@@ -79,6 +79,14 @@ instance UserStorageBackend BE where
   type UserId BE = String
   createUser bck (User {..}) = return $ Right $ T.unpack $ u_name
 
+class PaymentStorageBackend a
+
+cmdsall :: (UserStorageBackend bck, PaymentStorageBackend bck) => Proxy bck -> [Command bck (IO Response)]
+cmdsall bck = cmds bck ++ cmdsp bck
+
+cmdsp :: PaymentStorageBackend bck => Proxy bck -> [Command bck (IO Response)]
+cmdsp = undefined
+
 cmds :: UserStorageBackend bck => Proxy bck -> [Command bck (IO Response)]
 cmds _ =
   [ cmd "create-user" False
