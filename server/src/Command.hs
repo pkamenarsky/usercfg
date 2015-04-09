@@ -73,19 +73,21 @@ optMay optName optDesc optDefault' = Option
   }
 
 data Command bck r = forall opts. ToJSON opts => Command
-  { cmdName :: T.Text
-  , cmdOpts :: opts
-  , cmdFn   :: Resolve (bck -> r)
+  { cmdName     :: T.Text
+  , cmdConfirm  :: Bool
+  , cmdOpts     :: opts
+  , cmdFn       :: Resolve (bck -> r)
   }
 
 instance ToJSON (Command bck r) where
   toJSON (Command {..}) = object
     [ "name"    .= cmdName
     , "options" .= cmdOpts
+    , "confirm" .= cmdConfirm
     ]
 
 apply :: (Monad m, SequenceT a (m b), Curry (b -> c) d)  => a -> d -> m c
 apply opts f = sequenceT opts >>= return . uncurryN f
 
-cmd :: (ToJSON opts, SequenceT opts (Option b), Curry (b -> bck -> r) f) => T.Text -> opts -> f -> Command bck r
-cmd cmdName cmdOpts f = Command { cmdFn = optResolve $ apply cmdOpts f, .. }
+cmd :: (ToJSON opts, SequenceT opts (Option b), Curry (b -> bck -> r) f) => T.Text -> Bool -> opts -> f -> Command bck r
+cmd cmdName cmdConfirm cmdOpts f = Command { cmdFn = optResolve $ apply cmdOpts f, .. }
