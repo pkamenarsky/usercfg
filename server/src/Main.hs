@@ -57,8 +57,9 @@ instance UserStorageBackend BE where
   type UserId BE = String
   createUser bck (User {..}) = return $ Right $ T.unpack $ u_name
 
-crUser :: UserStorageBackend bck => Command bck (IO Response)
-crUser = cmd "create-user"
+cmds :: UserStorageBackend bck => Proxy bck -> [Command bck (IO Response)]
+cmds _ =
+  [ cmd "create-user"
     ( opt    "name" "User name"
     , opt    "email" "User mail"
     , opt    "password" "User password"
@@ -71,11 +72,21 @@ crUser = cmd "create-user"
                              , ..
                              })
         return Ok
-
-cmds :: UserStorageBackend bck => Proxy bck -> [Command bck (IO Response)]
-cmds _ = [ crUser
-         , crUser
-         ]
+  , cmd "delete-user"
+    ( opt    "name" "User name"
+    , opt    "password" "User password"
+    ) $ \name password bck -> do
+        sId <- authUser bck name (PasswordPlain password) 0
+        case sId of
+          Just sId' -> do
+            userId <- verifySession bck sId' 0
+            case userId of
+              Just userId' -> do
+                deleteUser bck userId'
+                return Ok
+              Nothing -> return $ Fail "Invalid user"
+          Nothing -> return $ Fail "Invalid user"
+  ]
 
 mkProxy :: a -> Proxy a
 mkProxy _ = Proxy
