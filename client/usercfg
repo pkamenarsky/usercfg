@@ -1,0 +1,22 @@
+#!/usr/bin/python
+
+import argparse
+import urllib2
+import json
+
+parser = argparse.ArgumentParser(description='User configuration utility')
+
+response = urllib2.urlopen('http://localhost:8000/info')
+data = json.load(response)
+
+subparsers = parser.add_subparsers(title='commands', help='-h gives command help')
+
+for command in data['response']:
+  subparser = subparsers.add_parser(command['name'], help='Help for command')
+
+  for option in command['options']:
+    subparser.add_argument('--' + option['name'], help=option['description'])
+
+args, unknown = parser.parse_known_args()
+
+print(unknown)

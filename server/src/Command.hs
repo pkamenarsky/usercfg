@@ -8,11 +8,13 @@ import           Control.Monad.Reader
 
 import           Data.Aeson
 import           Data.Aeson.Types
-import qualified Data.Text as T
+import qualified Data.Text            as T
 import           Data.Maybe
 
 import           Data.Tuple.Curry
 import           Data.Tuple.Sequence
+
+import qualified Data.Vector          as V
 
 import           Web.Users.Types
 import           Web.PathPieces
@@ -30,13 +32,20 @@ data Option a = Option
   , optResolve  :: Resolve a
   } deriving Functor
 
+object' :: [(T.Text, Value)] -> Value
+object' = object . filter (not . isDflt . snd)
+  where
+    isDflt Null       = True
+    isDflt (Bool b)   = not b
+    isDflt (Array a)  = V.null a
+    isDflt _          = False
+
 instance ToJSON a => ToJSON (Option a) where
-  toJSON (Option {..}) = object $
+  toJSON (Option {..}) = object'
     [ "name"        .= optName
     , "description" .= optDesc
-    ] ++ if isJust optDefault
-    then [ "default" .= optDefault ]
-    else []
+    , "default"     .= optDefault
+    ]
 
 emptyOption :: Option a
 emptyOption = Option { optName = "", optDesc = "", optDefault = Nothing, optResolve = undefined }
