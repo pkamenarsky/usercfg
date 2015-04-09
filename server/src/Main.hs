@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, FlexibleInstances, MultiParamTypeClasses, TypeFamilies, RecordWildCards, OverloadedStrings, TemplateHaskell, TypeOperators #-}
+{-# LANGUAGE DataKinds, ExistentialQuantification, FlexibleInstances, MultiParamTypeClasses, TypeFamilies, RecordWildCards, OverloadedStrings, TemplateHaskell, TypeOperators #-}
 
 module Main where
 
@@ -6,6 +6,7 @@ import           Control.Applicative
 import           Control.Monad.Reader
 
 import           Data.Aeson
+import qualified Data.Aeson             as A
 import           Data.Aeson.TH
 import           Data.Maybe
 import           Data.Proxy
@@ -21,6 +22,24 @@ import           Network.Wai.Handler.Warp
 import           Command
 import           Model
 
+data Error = forall e. ToJSON e => UserStorageBackendError e
+           | InvalidUserError
+           | NoSuchCommandError
+
+instance ToJSON CreateUserError where
+  toJSON _ = A.String "create_user"
+
+instance ToJSON UpdateUserError where
+  toJSON _ = A.String "update_user"
+
+instance ToJSON TokenError where
+  toJSON _ = A.String "token"
+
+instance ToJSON Error where
+  toJSON (UserStorageBackendError e) = toJSON e
+  toJSON InvalidUserError            = A.String "invalid_user"
+  toJSON NoSuchCommandError          = A.String "no_such_command"
+
 data Request = Request
   { rqCommand :: T.Text
   , rqOptions :: [(T.Text, T.Text)]
@@ -32,11 +51,14 @@ deriveJSON (opts { fieldLabelModifier     = rmvPrefix "rq"
 data Response =
     Ok
   | Response Value
-  | Fail T.Text
-    deriving (Eq, Show)
+  | Fail Error
 
-deriveJSON (opts { fieldLabelModifier     = rmvPrefix "rsp"
-                 , constructorTagModifier = rmvPrefix ""}) ''Response
+instance ToJSON Response where
+  toJSON Ok           = object [ "status" .= ("ok" :: T.Text) ]
+  toJSON (Response v) = object [ "status" .= ("ok" :: T.Text)
+                               , "response" .= v ]
+  toJSON (Fail e)     = object [ "status" .= ("error" :: T.Text)
+                               , "error" .= toJSON e ]
 
 data UserData = UserData
   { usrNumber :: Maybe T.Text
@@ -84,15 +106,15 @@ cmds _ =
               Just userId' -> do
                 deleteUser bck userId'
                 return Ok
-              Nothing -> return $ Fail "Invalid user"
-          Nothing -> return $ Fail "Invalid user"
+              Nothing -> return $ Fail InvalidUserError
+          Nothing -> return $ Fail InvalidUserError
   ]
 
 mkProxy :: a -> Proxy a
 mkProxy _ = Proxy
 
 names :: UserStorageBackend bck => bck -> Keys -> IO [Response]
-names bck opts = mapM (\Command {..} -> maybe (return $ Fail "ERROR") ($ bck) (runReaderT cmdFn opts)) (cmds $ mkProxy bck)
+names bck opts = mapM (\Command {..} -> maybe (return $ Fail NoSuchCommandError) ($ bck) (runReaderT cmdFn opts)) (cmds $ mkProxy bck)
 
 main :: IO ()
 main = do
