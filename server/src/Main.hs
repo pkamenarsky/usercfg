@@ -27,10 +27,12 @@ data Error = forall e. ToJSON e => UserStorageBackendError e
            | NoSuchCommandError
 
 instance ToJSON CreateUserError where
-  toJSON _ = A.String "create_user"
+  toJSON UsernameOrEmailAlreadyTaken = A.String "create_user_user_or_email_taken"
+  toJSON InvalidPassword             = A.String "create_user_invalid_password"
 
 instance ToJSON UpdateUserError where
-  toJSON _ = A.String "update_user"
+  toJSON UsernameOrEmailAlreadyExists = A.String "update_user_user_or_email_exists"
+  toJSON UserDoesntExit               = A.String "update_user_user_doesnt_exist"
 
 instance ToJSON TokenError where
   toJSON _ = A.String "token"
@@ -96,12 +98,12 @@ cmds _ =
     , optMay "number" "User number" Nothing
     , optMay "ssh-key" "SSH public key" Nothing
     ) $ \u_name u_email password usrNumber usrSshKey bck -> do
-        createUser bck (User { u_active = True
-                             , u_more   = UserData { .. }
-                             , u_password = makePassword $ PasswordPlain password
-                             , ..
-                             })
-        return Ok
+        either (return . Fail . UserStorageBackendError) (const $ return Ok) =<<
+          createUser bck (User { u_active = True
+                               , u_more   = UserData { .. }
+                               , u_password = makePassword $ PasswordPlain password
+                               , ..
+                               })
   , cmd "delete-user" True
     ( opt    "name" "User name"
     , opt    "password" "User password"
