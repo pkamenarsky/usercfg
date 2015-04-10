@@ -23,6 +23,7 @@ import           Web.Stripe
 import           Web.Stripe.Plan
 
 import           Command
+import           Crypto
 import           Model
 
 data Error = forall e. ToJSON e => UserStorageBackendError e
@@ -121,15 +122,18 @@ cmds _ =
                 return Ok
               Nothing -> return $ Fail InvalidUserError
           Nothing -> return $ Fail InvalidUserError
-  {-
-  , cmd "add-payment" True
-    ( opt "name" "User name"
-    , opt "password" "User password"
-    , opt "plan"
-    ) $ \name password plan bck -> do
-        return Ok
-  -}
   ]
+
+{-
+unsafeAddPayment :: UserStorageBackend bck => Command bck (NoAuthT IO Response)
+unsafeAddPayment =  cmd "add-payment" True
+    ( opt "name" "User name"
+    -- , opt "password" "User password"
+    , opt "plan" "Payment plan"
+    ) $ \name {- password -} (plan :: T.Text) bck -> do
+        sId <- unsafeAuthUser bck name 0
+        return Ok
+-}
 
 mkProxy :: a -> Proxy a
 mkProxy _ = Proxy
