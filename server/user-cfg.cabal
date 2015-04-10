@@ -22,6 +22,8 @@ executable user-cfg
   build-depends:       base >=4.7 && <4.8,
                        aeson,
                        bytestring,
+                       crypto-pubkey,
+                       crypto-pubkey-openssh,
                        mtl,
                        path-pieces,
                        servant,
@@ -29,7 +31,7 @@ executable user-cfg
                        stripe-haskell,
                        text,
                        tuple,
-                       users >= 0.2.0.1,
+                       users >= 0.2.0.2,
                        vector,
                        warp
   hs-source-dirs:      src
