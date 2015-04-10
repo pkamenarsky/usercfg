@@ -3,6 +3,10 @@ module Model where
 import Data.Aeson.TH
 import Data.Char
 
+deriveJSON' prf = deriveJSON
+  (opts { fieldLabelModifier     = rmvPrefix prf
+        , constructorTagModifier = rmvPrefix ""})
+
 rmvPrefix :: String -> String -> String
 rmvPrefix prf = hyphenize . lower . drop (length prf)
   where lower []     = []

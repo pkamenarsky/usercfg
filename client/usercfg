@@ -3,7 +3,35 @@
 import argparse
 import urllib2
 import json
+import DiffieHellman
+import commands
+import subprocess
+import paramiko.agent
+import base64
 
+dh = DiffieHellman.DiffieHellman()
+
+response = urllib2.urlopen('http://localhost:8001/dh', json.dumps({ 'cl-pub': dh.publicKey, 'req-user': 'phil' }))
+svPublicKey = json.load(response)['sv-pub']
+
+shared = dh.genSecret(dh.privateKey, svPublicKey)
+
+agent = paramiko.Agent()
+keys = agent.get_keys()
+
+if len(keys) < 1:
+  subprocess.call('ssh-add')
+  agent = paramiko.Agent()
+  keys = agent.get_keys()
+
+sig = base64.b64encode(keys[0].sign_ssh_data(str(shared)))
+
+response = urllib2.urlopen('http://localhost:8001/sign', json.dumps({ 'cl-sig' : sig, 'sgn-user': 'phil' }))
+svSignResponse = json.load(response)
+
+print(svSignResponse)
+
+'''
 parser = argparse.ArgumentParser(description='User configuration utility')
 
 response = urllib2.urlopen('http://localhost:8000/info')
@@ -18,3 +46,4 @@ for command in data['response']:
     subparser.add_argument('--' + option['name'], help=option['description'])
 
 args = parser.parse_args()
+'''
