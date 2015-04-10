@@ -19,6 +19,9 @@ import qualified Data.Text              as T
 
 import           Network.Wai.Handler.Warp
 
+import           Web.Stripe
+import           Web.Stripe.Plan
+
 import           Command
 import           Model
 
@@ -56,11 +59,11 @@ data Response =
   | Fail Error
 
 instance ToJSON Response where
-  toJSON Ok           = object [ "status" .= ("ok" :: T.Text) ]
-  toJSON (Response v) = object [ "status" .= ("ok" :: T.Text)
-                               , "response" .= v ]
-  toJSON (Fail e)     = object [ "status" .= ("error" :: T.Text)
-                               , "error" .= toJSON e ]
+  toJSON Ok           = A.object [ "status" .= ("ok" :: T.Text) ]
+  toJSON (Response v) = A.object [ "status" .= ("ok" :: T.Text)
+                                 , "response" .= v ]
+  toJSON (Fail e)     = A.object [ "status" .= ("error" :: T.Text)
+                                 , "error" .= toJSON e ]
 
 data UserData = UserData
   { usrNumber :: Maybe T.Text
@@ -105,8 +108,8 @@ cmds _ =
                                , ..
                                })
   , cmd "delete-user" True
-    ( opt    "name" "User name"
-    , opt    "password" "User password"
+    ( opt "name" "User name"
+    , opt "password" "User password"
     ) $ \name password bck -> do
         sId <- authUser bck name (PasswordPlain password) 0
         case sId of
@@ -118,6 +121,14 @@ cmds _ =
                 return Ok
               Nothing -> return $ Fail InvalidUserError
           Nothing -> return $ Fail InvalidUserError
+  {-
+  , cmd "add-payment" True
+    ( opt "name" "User name"
+    , opt "password" "User password"
+    , opt "plan"
+    ) $ \name password plan bck -> do
+        return Ok
+  -}
   ]
 
 mkProxy :: a -> Proxy a
