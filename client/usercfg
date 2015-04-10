@@ -4,6 +4,8 @@ import argparse
 import urllib2
 import json
 
+# openssl dgst -sha256 -sign ~/.ssh/id_rsa f > f.sign
+
 parser = argparse.ArgumentParser(description='User configuration utility')
 
 response = urllib2.urlopen('http://localhost:8000/info')
