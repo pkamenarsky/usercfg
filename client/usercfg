@@ -8,7 +8,13 @@ import DiffieHellman
 # openssl dgst -sha256 -sign ~/.ssh/id_rsa f > f.sign
 
 dh = DiffieHellman.DiffieHellman()
-print(dh.publicKey)
+# print(dh.publicKey)
+
+response = urllib2.urlopen('http://localhost:8001/dh', json.dumps({ 'cl-pub' : dh.publicKey }))
+svPublicKey = json.load(response)['sv-pub']
+
+dh.genKey(svPublicKey)
+print(dh.genSecret(dh.privateKey, svPublicKey))
 
 '''
 parser = argparse.ArgumentParser(description='User configuration utility')
