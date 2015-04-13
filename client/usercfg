@@ -3,9 +3,14 @@
 import argparse
 import urllib2
 import json
+import DiffieHellman
 
 # openssl dgst -sha256 -sign ~/.ssh/id_rsa f > f.sign
 
+dh = DiffieHellman.DiffieHellman()
+print(dh.publicKey)
+
+'''
 parser = argparse.ArgumentParser(description='User configuration utility')
 
 response = urllib2.urlopen('http://localhost:8000/info')
@@ -20,3 +25,4 @@ for command in data['response']:
     subparser.add_argument('--' + option['name'], help=option['description'])
 
 args = parser.parse_args()
+'''
