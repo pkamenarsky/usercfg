@@ -17,8 +17,14 @@ svPublicKey = json.load(response)['sv-pub']
 shared = dh.genSecret(dh.privateKey, svPublicKey)
 
 agent = paramiko.Agent()
-key = agent.get_keys()[0]
-sig = base64.b64encode(key.sign_ssh_data(str(shared)))
+keys = agent.get_keys()
+
+if len(keys) < 1:
+  subprocess.call('ssh-add')
+  agent = paramiko.Agent()
+  keys = agent.get_keys()
+
+sig = base64.b64encode(keys[0].sign_ssh_data(str(shared)))
 
 response = urllib2.urlopen('http://localhost:8001/sign', json.dumps({ 'cl-sig' : sig }))
 svSignResponse = json.load(response)
