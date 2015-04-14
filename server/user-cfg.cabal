@@ -33,6 +33,7 @@ executable user-cfg
                        cryptohash,
                        lrucache,
                        mtl,
+                       OneTuple,
                        path-pieces,
                        postgresql-simple,
                        servant,

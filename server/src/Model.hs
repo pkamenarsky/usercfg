@@ -63,7 +63,12 @@ deriveJSON' "usr" ''UserData
 
 data DhRequest      = DhRequest          { dhReqUser :: T.Text, dhClPub :: Integer } deriving Show
 data DhResponse     = DhResponse         { dhSvPub :: Integer } deriving Show
-data DhSignRequest  = DhSignRequest      { dhClSgnUser :: T.Text, dhClKeyHash :: T.Text, dhClSig :: T.Text } deriving Show
+data DhSignRequest  = DhSignRequest      { dhClSgnUser :: T.Text
+                                         , dhClKeyHash :: T.Text
+                                         , dhClSig     :: T.Text
+                                         , dhClCommand :: T.Text
+                                         , dhClOptions :: [(T.Text, T.Text)]
+                                         } deriving Show
 data DhSignResponse = SignOk | SignNotOk { dhSvReason :: String } deriving Show
 
 deriveJSON' "dh" ''DhRequest

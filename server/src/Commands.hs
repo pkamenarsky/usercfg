@@ -10,6 +10,7 @@ import qualified Data.Map               as M
 import           Data.Proxy
 import qualified Data.Text.Encoding     as TE
 
+import           Data.Tuple.OneTuple
 import           Web.Users.Types
 
 import           Model
@@ -57,19 +58,6 @@ cmds _ =
             , u_password = makePassword $ PasswordPlain password
             , ..
             })
-  , cmd "delete-user" True
-    ( opt "name" "User name"
-    , opt "password" "User password"
-    ) $ \name password bck -> do
-        sId <- authUser bck name (PasswordPlain password) 0
-        case sId of
-          Just sId' -> do
-            userId <- verifySession bck sId' 0
-            case userId of
-              Just userId' -> do
-                deleteUser bck userId'
-                return Ok
-              Nothing -> return $ Fail InvalidUserError
-          Nothing -> return $ Fail InvalidUserError
+  , cmdAuth "delete-user" True (OneTuple $ optMay "asd" "asd" Nothing :: OneTuple (Option (Maybe String))) $ \_ uid bck -> deleteUser bck uid >> return Ok
   ]
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, ExistentialQuantification, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings, RecordWildCards, TemplateHaskell #-}
+{-# LANGUAGE DeriveFunctor, ExistentialQuantification, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings, RecordWildCards, TemplateHaskell, TypeFamilies #-}
 
 module Command where
 
@@ -12,6 +12,7 @@ import qualified Data.Text            as T
 import           Data.Maybe
 
 import           Data.Tuple.Curry
+import           Data.Tuple.OneTuple
 import           Data.Tuple.Sequence
 
 import qualified Data.Vector          as V
@@ -76,7 +77,7 @@ data Command bck r = forall opts. ToJSON opts => Command
   { cmdName     :: T.Text
   , cmdConfirm  :: Bool
   , cmdOpts     :: opts
-  , cmdFn       :: Resolve (bck -> r)
+  , cmdFn       :: Either (Resolve (bck -> r)) (Resolve (UserId bck -> bck -> r))
   }
 
 instance ToJSON (Command bck r) where
@@ -84,10 +85,22 @@ instance ToJSON (Command bck r) where
     [ "name"    .= cmdName
     , "options" .= cmdOpts
     , "confirm" .= cmdConfirm
+    , "auth"    .= isLeft cmdFn
     ]
+    where isLeft e | Left _ <- e = False
+                   | otherwise   = True
+
+instance FromJSON a => FromJSON (OneTuple a) where
+  parseJSON a = OneTuple <$> parseJSON a
+
+instance ToJSON a => ToJSON (OneTuple a) where
+  toJSON (OneTuple a) = toJSON a
 
 apply :: (Monad m, SequenceT a (m b), Curry (b -> c) d)  => a -> d -> m c
 apply opts f = sequenceT opts >>= return . uncurryN f
 
 cmd :: (ToJSON opts, SequenceT opts (Option b), Curry (b -> bck -> r) f) => T.Text -> Bool -> opts -> f -> Command bck r
-cmd cmdName cmdConfirm cmdOpts f = Command { cmdFn = optResolve $ apply cmdOpts f, .. }
+cmd cmdName cmdConfirm cmdOpts f = Command { cmdFn = Left $ optResolve $ apply cmdOpts f, .. }
+
+cmdAuth :: (ToJSON opts, SequenceT opts (Option b), Curry (b -> UserId bck -> bck -> r) f) => T.Text -> Bool -> opts -> f -> Command bck r
+cmdAuth cmdName cmdConfirm cmdOpts f = Command { cmdFn = Right $ optResolve $ apply cmdOpts f, .. }
