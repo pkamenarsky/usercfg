@@ -11,7 +11,7 @@ import base64
 
 dh = DiffieHellman.DiffieHellman()
 
-response = urllib2.urlopen('http://localhost:8001/dh', json.dumps({ 'cl-pub': dh.publicKey, 'req-user': 'phil' }))
+response = urllib2.urlopen('http://localhost:8000/dh', json.dumps({ 'cl-pub': dh.publicKey, 'req-user': 'phil' }))
 svPublicKey = json.load(response)['sv-pub']
 
 shared = dh.genSecret(dh.privateKey, svPublicKey)
@@ -26,7 +26,7 @@ if len(keys) < 1:
 
 sig = base64.b64encode(keys[0].sign_ssh_data(str(shared)))
 
-response = urllib2.urlopen('http://localhost:8001/sign', json.dumps({ 'cl-sig' : sig, 'sgn-user': 'phil' }))
+response = urllib2.urlopen('http://localhost:8000/sign', json.dumps({ 'cl-sig' : sig, 'cl-sgn-user': 'phil', 'cl-key-hash' : '' }))
 svSignResponse = json.load(response)
 
 print(svSignResponse)
