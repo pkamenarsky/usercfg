@@ -4,6 +4,7 @@ module Commands where
 
 import qualified Crypto.Hash.SHA1       as H
 
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.Map               as M
 import           Data.Proxy
@@ -22,7 +23,7 @@ cruser = cmd "create-user" False
     , optMay "number" "User number" Nothing
     , optMay "ssh-key" "SSH public key" Nothing
     ) $ \u_name u_email password usrNumber sshKey bck -> do
-        let sshKeyHash =  maybe "" (TE.decodeUtf8 . B64.encode . H.hash . TE.encodeUtf8) sshKey
+        let sshKeyHash =  maybe "" (TE.decodeUtf8 . B16.encode . H.hash . TE.encodeUtf8) sshKey
 
         either (return . Fail . UserStorageBackendError) (const $ return Ok) =<<
           createUser bck (User
@@ -44,7 +45,7 @@ cmds _ =
     , optMay "number" "User number" Nothing
     , optMay "ssh-key" "SSH public key" Nothing
     ) $ \u_name u_email password usrNumber sshKey bck -> do
-        let sshKeyHash =  maybe "" (TE.decodeUtf8 . B64.encode . H.hash . TE.encodeUtf8) sshKey
+        let sshKeyHash =  maybe "" (TE.decodeUtf8 . B16.encode . H.hash . TE.encodeUtf8) sshKey
 
         either (return . Fail . UserStorageBackendError) (const $ return Ok) =<<
           createUser bck (User
