@@ -22,6 +22,7 @@ executable user-cfg
   build-depends:       base >=4.7 && <4.8,
                        aeson,
                        base64-bytestring,
+                       base16-bytestring,
                        bytestring,
                        cereal,
                        containers,
@@ -32,7 +33,9 @@ executable user-cfg
                        cryptohash,
                        lrucache,
                        mtl,
+                       OneTuple,
                        path-pieces,
+                       postgresql-simple,
                        servant,
                        servant-server,
                        stripe-haskell,
@@ -40,6 +43,7 @@ executable user-cfg
                        transformers,
                        tuple,
                        users >= 0.2.0.2,
+                       users-postgresql-simple >= 0.2.0.2,
                        vector,
                        warp
   hs-source-dirs:      src

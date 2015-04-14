@@ -12,6 +12,7 @@ import           Crypto.PubKey.RSA.PKCS15
 import           Crypto.PubKey.DH
 import           Crypto.Random
 import           Crypto.Types.PubKey.DH
+import           Crypto.Types.PubKey.RSA
 
 import           Data.Aeson
 import qualified Data.Aeson               as A
@@ -21,17 +22,23 @@ import qualified Data.ByteString.Base64   as B64
 import qualified Data.ByteString.Char8    as BC
 import qualified Data.Cache.LRU           as LRU
 import           Data.IORef
+import qualified Data.Map               as M
 import           Data.Maybe
 import           Data.Proxy
 import           Data.Serialize.Get       (getWord32be, getWord8, runGet)
 import qualified Data.Text.Encoding     as TE
 import           Data.Word
 
+import           Database.PostgreSQL.Simple
+
 import           Servant.API
 import           Servant.Server
+
 import           Web.Users.Types
+import           Web.Users.Postgresql
 
 import qualified Data.Text                as T
+import qualified Data.Text.Read           as TR
 
 import           Network.Wai.Handler.Warp
 
@@ -62,20 +69,18 @@ data DhData = DhData
 
 type DhState = IORef DhData
 
-data BE = BE
+runServer :: IO ()
+runServer = do
+  ep  <- createEntropyPool
+  st  <- newIORef $ DhData (LRU.newLRU $ Just 10000) (cprgCreate ep)
 
-instance UserStorageBackend BE where
-  type UserId BE = String
-  createUser bck (User {..}) = return $ Right $ T.unpack $ u_name
+  bck <- connectPostgreSQL ""
 
-runServer :: UserStorageBackend bck => bck -> IO ()
-runServer bck = do
-  ep <- createEntropyPool
-  st <- newIORef $ DhData (LRU.newLRU $ Just 10000) (cprgCreate ep)
+  initUserBackend bck
 
-  runServer' st
+  runServer' bck st
   where
-    runServer' st = run 8000 $ serve api $ info
+    runServer' bck st = run 8000 $ serve api $ info
                                       :<|> dh
                                       :<|> sign
 #ifdef DEBUG
@@ -100,19 +105,14 @@ runServer bck = do
            return $ DhResponse svPub
 
         sign DhSignRequest {..} = liftIO $ do
-          bs  <- B.readFile "/Users/phil/.ssh/id_rsa.pub"
           st' <- readIORef st
 
           let (lru', shared') = LRU.delete dhClSgnUser $ dhLRU st'
-              verifyUserKey UserData {..} = undefined
 
           writeIORef st $ st' { dhLRU = lru' }
 
-          -- sid <- authUserByUserData bck dhSgnUser verifyUserKey 0
-
           -- FIXME: failing pattern matches
           let Just (SharedKey shared) = shared'
-              Right (OpenSshPublicKeyRsa key _) = decodePublic bs
               Right clBlob = B64.decode $ TE.encodeUtf8 $ dhClSig
 
               Right (algo, sig) = flip runGet clBlob $ do
@@ -122,11 +122,21 @@ runServer bck = do
                 sig  <- B.pack <$> replicateM sl getWord8
                 return (algo, sig)
 
-          return $ if algo /= BC.pack "ssh-rsa"
-            then SignNotOk "algo-not-ssh-rsa"
-            else if verify hashDescrSHA1 key (BC.pack $ show shared) sig
-              then SignOk
-              else SignNotOk "verify"
+              verifyUserKey UserData {..}
+                | Just  key <- M.lookup dhClKeyHash usrSshKeys
+                , Right (OpenSshPublicKeyRsa pubkey _) <- decodePublic $ TE.encodeUtf8 key
+                    = verifyUserKey' pubkey
+                | otherwise = False
+
+              verifyUserKey' pubkey = verify hashDescrSHA1 pubkey (BC.pack $ show shared) sig
+
+          sid <- authUserByUserData bck dhClSgnUser verifyUserKey 0
+
+          let result | algo /= BC.pack "ssh-rsa" = SignNotOk "algo-not-ssh-rsa"
+                     | Just _ <- sid = SignOk
+                     | otherwise = SignNotOk "verify"
+
+          return result
 
 #ifdef DEBUG
         printState = liftIO $ do

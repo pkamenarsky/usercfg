@@ -8,6 +8,10 @@ import commands
 import subprocess
 import paramiko.agent
 import base64
+import hashlib
+import os.path
+
+home = os.path.expanduser("~")
 
 dh = DiffieHellman.DiffieHellman()
 
@@ -24,9 +28,17 @@ if len(keys) < 1:
   agent = paramiko.Agent()
   keys = agent.get_keys()
 
+pubkeySha1 = ''
+
+with open(home + '/.ssh/id_rsa.pub', 'r') as content_file:
+  pubkey = content_file.read()
+  pubkeySha1 = hashlib.sha1(pubkey).hexdigest()
+
+  print(pubkeySha1)
+
 sig = base64.b64encode(keys[0].sign_ssh_data(str(shared)))
 
-response = urllib2.urlopen('http://localhost:8000/sign', json.dumps({ 'cl-sig' : sig, 'cl-sgn-user': 'phil', 'cl-key-hash' : '' }))
+response = urllib2.urlopen('http://localhost:8000/sign', json.dumps({ 'cl-sig' : sig, 'cl-sgn-user': 'phil', 'cl-key-hash' : pubkeySha1 }))
 svSignResponse = json.load(response)
 
 print(svSignResponse)
