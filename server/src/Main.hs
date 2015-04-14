@@ -131,6 +131,7 @@ runServer = do
               verifyUserKey' pubkey = verify hashDescrSHA1 pubkey (BC.pack $ show shared) sig
 
           sid <- authUserByUserData bck dhClSgnUser verifyUserKey 0
+          exec bck dhClCommand dhClOptions
 
           let result | algo /= BC.pack "ssh-rsa" = SignNotOk "algo-not-ssh-rsa"
                      | Just _ <- sid = SignOk
