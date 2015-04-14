@@ -96,11 +96,14 @@ instance FromJSON a => FromJSON (OneTuple a) where
 instance ToJSON a => ToJSON (OneTuple a) where
   toJSON (OneTuple a) = toJSON a
 
+noArgs :: Data.Tuple.OneTuple.OneTuple (Option (Maybe ()))
+noArgs = OneTuple $ optMay "" "" Nothing :: OneTuple (Option (Maybe ()))
+
 apply :: (Monad m, SequenceT a (m b), Curry (b -> c) d)  => a -> d -> m c
 apply opts f = sequenceT opts >>= return . uncurryN f
 
-cmd :: (ToJSON opts, SequenceT opts (Option b), Curry (b -> bck -> r) f) => T.Text -> Bool -> opts -> f -> Command bck r
-cmd cmdName cmdConfirm cmdOpts f = Command { cmdFn = Left $ optResolve $ apply cmdOpts f, .. }
+cmd :: (ToJSON opts, SequenceT opts (Option b), Curry (b -> bck -> r) f) => T.Text -> Bool -> opts -> f -> (T.Text, Command bck r)
+cmd cmdName cmdConfirm cmdOpts f = (cmdName, Command { cmdFn = Left $ optResolve $ apply cmdOpts f, .. })
 
-cmdAuth :: (ToJSON opts, SequenceT opts (Option b), Curry (b -> UserId bck -> bck -> r) f) => T.Text -> Bool -> opts -> f -> Command bck r
-cmdAuth cmdName cmdConfirm cmdOpts f = Command { cmdFn = Right $ optResolve $ apply cmdOpts f, .. }
+cmdAuth :: (ToJSON opts, SequenceT opts (Option b), Curry (b -> UserId bck -> bck -> r) f) => T.Text -> Bool -> opts -> f -> (T.Text, Command bck r)
+cmdAuth cmdName cmdConfirm cmdOpts f = (cmdName, Command { cmdFn = Right $ optResolve $ apply cmdOpts f, .. })
