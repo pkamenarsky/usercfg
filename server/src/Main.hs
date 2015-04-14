@@ -104,7 +104,7 @@ runServer = do
 
            return $ DhResponse svPub
 
-        sign DhSignRequest {..} = liftIO $ do
+        sign aa@(DhSignRequest {..}) = liftIO $ do
           st' <- readIORef st
 
           let (lru', shared') = LRU.delete dhClSgnUser $ dhLRU st'
