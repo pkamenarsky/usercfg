@@ -33,6 +33,7 @@ executable user-cfg
                        lrucache,
                        mtl,
                        path-pieces,
+                       postgresql-simple,
                        servant,
                        servant-server,
                        stripe-haskell,
@@ -40,6 +41,7 @@ executable user-cfg
                        transformers,
                        tuple,
                        users >= 0.2.0.2,
+                       users-postgresql-simple >= 0.2.0.2,
                        vector,
                        warp
   hs-source-dirs:      src

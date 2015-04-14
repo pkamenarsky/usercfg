@@ -27,9 +27,13 @@ import           Data.Serialize.Get       (getWord32be, getWord8, runGet)
 import qualified Data.Text.Encoding     as TE
 import           Data.Word
 
+import           Database.PostgreSQL.Simple
+
 import           Servant.API
 import           Servant.Server
+
 import           Web.Users.Types
+import           Web.Users.Postgresql
 
 import qualified Data.Text                as T
 
@@ -68,14 +72,18 @@ instance UserStorageBackend BE where
   type UserId BE = String
   createUser bck (User {..}) = return $ Right $ T.unpack $ u_name
 
-runServer :: UserStorageBackend bck => bck -> IO ()
-runServer bck = do
-  ep <- createEntropyPool
-  st <- newIORef $ DhData (LRU.newLRU $ Just 10000) (cprgCreate ep)
+runServer :: IO ()
+runServer = do
+  ep  <- createEntropyPool
+  st  <- newIORef $ DhData (LRU.newLRU $ Just 10000) (cprgCreate ep)
 
-  runServer' st
+  bck <- connectPostgreSQL ""
+
+  initUserBackend bck
+
+  runServer' bck st
   where
-    runServer' st = run 8000 $ serve api $ info
+    runServer' bck st = run 8000 $ serve api $ info
                                       :<|> dh
                                       :<|> sign
 #ifdef DEBUG
