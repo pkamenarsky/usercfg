@@ -9,11 +9,15 @@ import           Crypto.PubKey.DH
 import           Crypto.Random
 import           Crypto.Types.PubKey.DH
 
-import qualified Data.ByteString as B
+import qualified Data.ByteString          as B
+import qualified Data.ByteString.Base16   as B16
+import qualified Data.ByteString.Char8    as BC
 
 ---
 
 import           Control.Monad.IO.Class
+
+import           Data.IORef
 import           Data.Proxy
 
 import           Network.Wai.Handler.Warp
@@ -36,27 +40,49 @@ genKeys clPub = do
       pub  = calculatePublic params priv
       shrd = getShared params priv clPub
 
-  print shrd
-  return pub
+  return (pub, shrd)
 
-data DhRequest  = DhRequest  { dhClPub :: Integer }
-data DhResponse = DhResponse { dhSvPub :: Integer }
+data DhRequest      = DhRequest     { dhClPub :: Integer }
+data DhResponse     = DhResponse    { dhSvPub :: Integer }
+data DhSignRequest  = DhSignRequest { dhClSig :: String }
+data DhSignResponse = SignOk | SignNotOk
 
 deriveJSON' "dh" ''DhRequest
 deriveJSON' "dh" ''DhResponse
+deriveJSON' "dh" ''DhSignRequest
+deriveJSON' "dh" ''DhSignResponse
 
 type DhApi = "dh" :> ReqBody DhRequest :> Post DhResponse
+        :<|> "sign" :> ReqBody DhSignRequest :> Post DhSignResponse
 
 dhApi :: Proxy DhApi
 dhApi = Proxy
 
-runDHServer :: IO ()
-runDHServer = do
-  run 8001 $ serve dhApi $ dh
+type DhState = IORef SharedKey
+
+runDHServer' = runDHServer =<< (newIORef (SharedKey 0))
+
+runDHServer :: DhState -> IO ()
+runDHServer st = do
+  run 8001 $ serve dhApi $ dh :<|> sign
     where
       dh (DhRequest {..}) = liftIO $ do
-        PublicNumber svPub <- genKeys $ PublicNumber dhClPub
+        (PublicNumber svPub, shared) <- genKeys $ PublicNumber dhClPub
+        writeIORef st shared
         return $ DhResponse svPub
+
+      sign (DhSignRequest {..}) = liftIO $ do
+        bs               <- B.readFile "/Users/phil/.ssh/id_rsa.pub"
+        SharedKey shared <- readIORef st
+
+        let Right (OpenSshPublicKeyRsa key _) = decodePublic bs
+            clSig = fst $ B16.decode $ BC.pack $ dhClSig
+
+        putStrLn $ show shared
+
+        return $ if verify hashDescrSHA256 key (BC.pack $ show shared) clSig
+          then SignOk
+          else SignNotOk
 
 loadKey :: IO ()
 loadKey = do

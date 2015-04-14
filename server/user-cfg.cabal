@@ -21,6 +21,7 @@ executable user-cfg
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8,
                        aeson,
+                       base16-bytestring,
                        bytestring,
                        crypto-pubkey,
                        crypto-pubkey-openssh,
