@@ -10,11 +10,16 @@ import           Crypto.Random
 import           Crypto.Types.PubKey.DH
 
 import qualified Data.ByteString          as B
-import qualified Data.ByteString.Base16   as B16
+import qualified Data.ByteString.Base64   as B64
 import qualified Data.ByteString.Char8    as BC
+
+import           Data.Serialize.Get
+import           Data.Word
 
 ---
 
+import           Control.Applicative
+import           Control.Monad
 import           Control.Monad.IO.Class
 
 import           Data.IORef
@@ -42,10 +47,10 @@ genKeys clPub = do
 
   return (pub, shrd)
 
-data DhRequest      = DhRequest     { dhClPub :: Integer }
-data DhResponse     = DhResponse    { dhSvPub :: Integer }
-data DhSignRequest  = DhSignRequest { dhClSig :: String }
-data DhSignResponse = SignOk | SignNotOk
+data DhRequest      = DhRequest          { dhClPub :: Integer }
+data DhResponse     = DhResponse         { dhSvPub :: Integer }
+data DhSignRequest  = DhSignRequest      { dhClSig :: String }
+data DhSignResponse = SignOk | SignNotOk { dhSvReason :: String }
 
 deriveJSON' "dh" ''DhRequest
 deriveJSON' "dh" ''DhResponse
@@ -76,13 +81,20 @@ runDHServer st = do
         SharedKey shared <- readIORef st
 
         let Right (OpenSshPublicKeyRsa key _) = decodePublic bs
-            clSig = fst $ B16.decode $ BC.pack $ dhClSig
+            Right clBlob = B64.decode $ BC.pack $ dhClSig
 
-        putStrLn $ show shared
+            Right (algo, sig) = flip runGet clBlob $ do
+              al   <- fromIntegral <$> getWord32be
+              algo <- B.pack <$> replicateM al getWord8
+              sl   <- fromIntegral <$> getWord32be
+              sig  <- B.pack <$> replicateM sl getWord8
+              return (algo, sig)
 
-        return $ if verify hashDescrSHA256 key (BC.pack $ show shared) clSig
-          then SignOk
-          else SignNotOk
+        return $ if algo /= BC.pack "ssh-rsa"
+          then SignNotOk "algo-not-ssh-rsa"
+          else if verify hashDescrSHA1 key (BC.pack $ show shared) sig
+            then SignOk
+            else SignNotOk "verify"
 
 loadKey :: IO ()
 loadKey = do

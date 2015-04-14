@@ -6,19 +6,20 @@ import json
 import DiffieHellman
 import commands
 import subprocess
-
-# openssl dgst -sha256 -sign ~/.ssh/id_rsa f > f.sign
+import paramiko.agent
+import base64
 
 dh = DiffieHellman.DiffieHellman()
-# print(dh.publicKey)
 
 response = urllib2.urlopen('http://localhost:8001/dh', json.dumps({ 'cl-pub' : dh.publicKey }))
 svPublicKey = json.load(response)['sv-pub']
 
 shared = dh.genSecret(dh.privateKey, svPublicKey)
 
-_, sig = commands.getstatusoutput('echo -n "' + str(shared) + '" | openssl dgst -sha256 -hex -sign ~/.ssh/id_rsa')
-print(shared)
+agent = paramiko.Agent()
+key = agent.get_keys()[0]
+sig = base64.b64encode(key.sign_ssh_data(str(shared)))
+
 response = urllib2.urlopen('http://localhost:8001/sign', json.dumps({ 'cl-sig' : sig }))
 svSignResponse = json.load(response)
 
