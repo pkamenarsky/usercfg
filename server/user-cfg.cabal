@@ -28,6 +28,7 @@ executable user-cfg
                        crypto-pubkey-openssh,
                        crypto-random,
                        crypto-pubkey-types,
+                       lrucache,
                        mtl,
                        path-pieces,
                        servant,
