@@ -47,7 +47,7 @@ data UserData = UserData
 deriveJSON' "usr" ''UserData
 
 data DhRequest    = DhRequest    { dhReqUser   :: T.Text, dhClPub :: Integer } deriving Show
-data DhCmdRequest = DhCmdRequest { dhClSgnUser :: T.Text
+data DhCmdRequest = DhCmdRequest { dhClUser    :: T.Text
                                  , dhClCommand :: T.Text
                                  , dhClOptions :: [(T.Text, T.Text)]
                                  , dhClPass    :: Maybe T.Text

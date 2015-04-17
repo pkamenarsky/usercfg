@@ -16,7 +16,7 @@ home = os.path.expanduser("~")
 dh = DiffieHellman.DiffieHellman()
 
 response = urllib2.urlopen('http://localhost:8000/dh', json.dumps({ 'cl-pub': dh.publicKey, 'req-user': 'phil' }))
-svPublicKey = json.load(response)['sv-pub']
+svPublicKey = json.load(response)['response']
 
 shared = dh.genSecret(dh.privateKey, svPublicKey)
 
@@ -38,7 +38,7 @@ with open(home + '/.ssh/id_rsa.pub', 'r') as content_file:
 
 sig = base64.b64encode(keys[0].sign_ssh_data(str(shared)))
 
-response = urllib2.urlopen('http://localhost:8000/sign', json.dumps({ 'cl-sig' : sig, 'cl-sgn-user': 'phil', 'cl-key-hash' : pubkeySha1 }))
+response = urllib2.urlopen('http://localhost:8000/cmd', json.dumps({ 'cl-command' : 'ping', 'cl-options': [['a', 'b']], 'cl-sig' : [pubkeySha1, sig], 'cl-user': 'phil' }))
 svSignResponse = json.load(response)
 
 print(svSignResponse)
