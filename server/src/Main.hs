@@ -45,6 +45,7 @@ import           Network.Wai.Handler.Warp
 import           Web.Stripe
 import           Web.Stripe.Plan
 
+import           Command
 import           Commands
 import           Model
 
@@ -53,8 +54,8 @@ params = Params
   2
 
 type Api = "info" :> Get Response
-      :<|> "dh" :> ReqBody DhRequest :> Post DhResponse
-      :<|> "sign" :> ReqBody DhSignRequest :> Post DhSignResponse
+      :<|> "dh" :> ReqBody DhRequest :> Post Response
+      :<|> "cmd" :> ReqBody DhCmdRequest :> Post Response
 #ifdef DEBUG
       :<|> "print_state" :> Get ()
 #endif
@@ -69,12 +70,10 @@ data DhData = DhData
 
 type DhState = IORef DhData
 
-runServer :: IO ()
-runServer = do
+runServer :: UserStorageBackend bck => bck -> [(T.Text, Command bck (IO Response))] -> IO ()
+runServer bck cmds = do
   ep  <- createEntropyPool
   st  <- newIORef $ DhData (LRU.newLRU $ Just 10000) (cprgCreate ep)
-
-  bck <- connectPostgreSQL ""
 
   initUserBackend bck
 
@@ -82,13 +81,13 @@ runServer = do
   where
     runServer' bck st = run 8000 $ serve api $ info
                                       :<|> dh
-                                      :<|> sign
+                                      :<|> cmd
 #ifdef DEBUG
                                       :<|> printState
 #endif
       where
         info = do
-          return $ Response $ toJSON $ cmds $ mkProxy bck
+          return $ Response $ toJSON cmds
 
         dh DhRequest {..} = liftIO $ do
            st' <- readIORef st
@@ -102,9 +101,9 @@ runServer = do
              , dhCPRG = cprg
              }
 
-           return $ DhResponse svPub
+           return $ Response $ toJSON svPub
 
-        sign DhSignRequest {..} = liftIO $ do
+        cmd DhCmdRequest {..} = liftIO $ do
           st' <- readIORef st
 
           let (lru', shared') = LRU.delete dhClSgnUser $ dhLRU st'
@@ -112,35 +111,46 @@ runServer = do
           writeIORef st $ st' { dhLRU = lru' }
 
           -- FIXME: failing pattern matches
-          let Just (SharedKey shared) = shared'
-              Right clBlob = B64.decode $ TE.encodeUtf8 $ dhClSig
-
-              Right (algo, sig) = flip runGet clBlob $ do
-                al   <- fromIntegral <$> getWord32be
-                algo <- B.pack <$> replicateM al getWord8
-                sl   <- fromIntegral <$> getWord32be
-                sig  <- B.pack <$> replicateM sl getWord8
-                return (algo, sig)
-
-              verifyUserKey UserData {..}
-                | Just  key <- M.lookup dhClKeyHash usrSshKeys
+          let verifyUserKey clKeyHash clSig shared UserData {..}
+                | Just  key <- M.lookup clKeyHash usrSshKeys
                 , Right (OpenSshPublicKeyRsa pubkey _) <- decodePublic $ TE.encodeUtf8 key
-                    = verifyUserKey' pubkey
+                    = verifyUserKey' clSig shared pubkey
                 | otherwise = False
 
-              verifyUserKey' pubkey = verify hashDescrSHA1 pubkey (BC.pack $ show shared) sig
+              verifyUserKey' sig shared pubkey = verify hashDescrSHA1 pubkey (BC.pack $ show shared) sig
 
-          sid <- authUserByUserData bck dhClSgnUser verifyUserKey 0
-          exec bck dhClCommand dhClOptions
+              Just cmd = lookup dhClCommand cmds
 
-          let result | algo /= BC.pack "ssh-rsa" = SignNotOk "algo-not-ssh-rsa"
-                     | Just _ <- sid = SignOk
-                     | otherwise = SignNotOk "verify"
+              auth | Just clPass <- dhClPass = authUser bck dhClSgnUser (PasswordPlain clPass) 0
+                   | Just (clKeyHash, clSig) <- dhClSig
+                   , Right (algo, sig, shared) <- getSig clSig = authUserByUserData bck dhClSgnUser (verifyUserKey clKeyHash sig shared) 0
+                where
+                  getSig clSig = flip runGet clBlob $ do
+                    al   <- fromIntegral <$> getWord32be
+                    algo <- B.pack <$> replicateM al getWord8
+                    sl   <- fromIntegral <$> getWord32be
+                    sig  <- B.pack <$> replicateM sl getWord8
+                    return (algo, sig, shared)
+                      where
+                        Just (SharedKey shared) = shared'
+                        Right clBlob = B64.decode $ TE.encodeUtf8 clSig
 
-          return result
+              exec
+                | Left f <- cmdFn cmd = maybe (return $ Fail NoSuchCommandError) ($ bck) $ runReaderT f dhClOptions
+                | Right f <- cmdFn cmd = do
+                    Just sid <- auth
+                    Just uid <- verifySession bck sid 0
+                    maybe (return $ Fail NoSuchCommandError) (\f -> f uid bck) $ runReaderT f dhClOptions
+
+          exec
 
 #ifdef DEBUG
         printState = liftIO $ do
           readIORef st >>= print . dhLRU
           return ()
 #endif
+
+main :: IO ()
+main = do
+  bck <- connectPostgreSQL ""
+  runServer bck cmds

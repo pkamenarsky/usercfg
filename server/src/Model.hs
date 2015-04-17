@@ -18,6 +18,8 @@ mkProxy _ = Proxy
 data Error = forall e. ToJSON e => UserStorageBackendError e
            | InvalidUserError
            | NoSuchCommandError
+           | SignAlgoNotSshRsa
+           | SignVerify
 
 instance ToJSON CreateUserError where
   toJSON UsernameOrEmailAlreadyTaken = A.String "create_user_user_or_email_taken"
@@ -34,25 +36,8 @@ instance ToJSON Error where
   toJSON (UserStorageBackendError e) = toJSON e
   toJSON InvalidUserError            = A.String "invalid_user"
   toJSON NoSuchCommandError          = A.String "no_such_command"
-
-data Request = Request
-  { rqCommand :: T.Text
-  , rqOptions :: [(T.Text, T.Text)]
-  } deriving (Eq, Show)
-
-deriveJSON' "rq" ''Request
-
-data Response =
-    Ok
-  | Response Value
-  | Fail Error
-
-instance ToJSON Response where
-  toJSON Ok           = A.object [ "status" .= ("ok" :: T.Text) ]
-  toJSON (Response v) = A.object [ "status" .= ("ok" :: T.Text)
-                                 , "response" .= v ]
-  toJSON (Fail e)     = A.object [ "status" .= ("error" :: T.Text)
-                                 , "error" .= toJSON e ]
+  toJSON SignAlgoNotSshRsa           = A.String "algo-not-ssh-rsa"
+  toJSON SignVerify                  = A.String "verify"
 
 data UserData = UserData
   { usrNumber  :: Maybe T.Text
@@ -61,18 +46,23 @@ data UserData = UserData
 
 deriveJSON' "usr" ''UserData
 
-data DhRequest      = DhRequest          { dhReqUser :: T.Text, dhClPub :: Integer } deriving Show
-data DhResponse     = DhResponse         { dhSvPub :: Integer } deriving Show
-data DhSignRequest  = DhSignRequest      { dhClSgnUser :: T.Text
-                                         , dhClKeyHash :: T.Text
-                                         , dhClSig     :: T.Text
-                                         , dhClCommand :: T.Text
-                                         , dhClOptions :: [(T.Text, T.Text)]
-                                         } deriving Show
-data DhSignResponse = SignOk | SignNotOk { dhSvReason :: String } deriving Show
+data DhRequest    = DhRequest    { dhReqUser   :: T.Text, dhClPub :: Integer } deriving Show
+data DhCmdRequest = DhCmdRequest { dhClSgnUser :: T.Text
+                                 , dhClCommand :: T.Text
+                                 , dhClOptions :: [(T.Text, T.Text)]
+                                 , dhClPass    :: Maybe T.Text
+                                 , dhClSig     :: Maybe (T.Text, T.Text)
+                                 } deriving Show
 
 deriveJSON' "dh" ''DhRequest
-deriveJSON' "dh" ''DhResponse
-deriveJSON' "dh" ''DhSignRequest
-deriveJSON' "dh" ''DhSignResponse
+deriveJSON' "dh" ''DhCmdRequest
+
+data Response = Ok | Response Value | Fail Error
+
+instance ToJSON Response where
+  toJSON Ok           = A.object [ "status" .= ("ok" :: T.Text) ]
+  toJSON (Response v) = A.object [ "status" .= ("ok" :: T.Text)
+                                 , "response" .= v ]
+  toJSON (Fail e)     = A.object [ "status" .= ("error" :: T.Text)
+                                 , "error" .= toJSON e ]
 
