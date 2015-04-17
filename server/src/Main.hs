@@ -111,37 +111,38 @@ runServer bck cmds = do
           writeIORef st $ st' { dhLRU = lru' }
 
           -- FIXME: failing pattern matches
-          let Just (SharedKey shared) = shared'
-              Right clBlob = B64.decode $ TE.encodeUtf8 $ dhClSig
-
-              Right (algo, sig) = flip runGet clBlob $ do
-                al   <- fromIntegral <$> getWord32be
-                algo <- B.pack <$> replicateM al getWord8
-                sl   <- fromIntegral <$> getWord32be
-                sig  <- B.pack <$> replicateM sl getWord8
-                return (algo, sig)
-
-              verifyUserKey UserData {..}
-                | Just  key <- M.lookup dhClKeyHash usrSshKeys
+          let verifyUserKey clKeyHash clSig shared UserData {..}
+                | Just  key <- M.lookup clKeyHash usrSshKeys
                 , Right (OpenSshPublicKeyRsa pubkey _) <- decodePublic $ TE.encodeUtf8 key
-                    = verifyUserKey' pubkey
+                    = verifyUserKey' clSig shared pubkey
                 | otherwise = False
 
-              verifyUserKey' pubkey = verify hashDescrSHA1 pubkey (BC.pack $ show shared) sig
+              verifyUserKey' sig shared pubkey = verify hashDescrSHA1 pubkey (BC.pack $ show shared) sig
+
+              Just cmd = lookup dhClCommand cmds
+
+              auth | Just clPass <- dhClPass = authUser bck dhClSgnUser (PasswordPlain clPass) 0
+                   | Just (clKeyHash, clSig) <- dhClSig
+                   , Right (algo, sig, shared) <- getSig clSig = authUserByUserData bck dhClSgnUser (verifyUserKey clKeyHash sig shared) 0
+                where
+                  getSig clSig = flip runGet clBlob $ do
+                    al   <- fromIntegral <$> getWord32be
+                    algo <- B.pack <$> replicateM al getWord8
+                    sl   <- fromIntegral <$> getWord32be
+                    sig  <- B.pack <$> replicateM sl getWord8
+                    return (algo, sig, shared)
+                      where
+                        Just (SharedKey shared) = shared'
+                        Right clBlob = B64.decode $ TE.encodeUtf8 clSig
 
               exec
-                | Just cmd' <- cmd, Left f <- cmdFn cmd' = maybe (return $ Fail NoSuchCommandError) ($ bck) $ runReaderT f dhClOptions
-                | otherwise = return $ Fail NoSuchCommandError
-                where
-                  cmd = lookup dhClCommand cmds
+                | Left f <- cmdFn cmd = maybe (return $ Fail NoSuchCommandError) ($ bck) $ runReaderT f dhClOptions
+                | Right f <- cmdFn cmd = do
+                    Just sid <- auth
+                    Just uid <- verifySession bck sid 0
+                    maybe (return $ Fail NoSuchCommandError) (\f -> f uid bck) $ runReaderT f dhClOptions
 
-          sid <- authUserByUserData bck dhClSgnUser verifyUserKey 0
-
-          let result | algo /= BC.pack "ssh-rsa" = Fail SignAlgoNotSshRsa
-                     | Just _ <- sid = Ok
-                     | otherwise = Fail SignVerify
-
-          return result
+          exec
 
 #ifdef DEBUG
         printState = liftIO $ do
