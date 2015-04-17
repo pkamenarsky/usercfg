@@ -45,6 +45,7 @@ import           Network.Wai.Handler.Warp
 import           Web.Stripe
 import           Web.Stripe.Plan
 
+import           Command
 import           Commands
 import           Model
 
@@ -53,8 +54,8 @@ params = Params
   2
 
 type Api = "info" :> Get Response
-      :<|> "dh" :> ReqBody DhRequest :> Post DhResponse
-      :<|> "sign" :> ReqBody DhSignRequest :> Post DhSignResponse
+      :<|> "dh" :> ReqBody DhRequest :> Post Response
+      :<|> "cmd" :> ReqBody DhCmdRequest :> Post Response
 #ifdef DEBUG
       :<|> "print_state" :> Get ()
 #endif
@@ -69,12 +70,10 @@ data DhData = DhData
 
 type DhState = IORef DhData
 
-runServer :: IO ()
-runServer = do
+runServer :: UserStorageBackend bck => bck -> [(T.Text, Command bck (IO Response))] -> IO ()
+runServer bck cmds = do
   ep  <- createEntropyPool
   st  <- newIORef $ DhData (LRU.newLRU $ Just 10000) (cprgCreate ep)
-
-  bck <- connectPostgreSQL ""
 
   initUserBackend bck
 
@@ -82,13 +81,13 @@ runServer = do
   where
     runServer' bck st = run 8000 $ serve api $ info
                                       :<|> dh
-                                      :<|> sign
+                                      :<|> cmd
 #ifdef DEBUG
                                       :<|> printState
 #endif
       where
         info = do
-          return $ Response $ toJSON $ cmds $ mkProxy bck
+          return $ Response $ toJSON cmds
 
         dh DhRequest {..} = liftIO $ do
            st' <- readIORef st
@@ -102,9 +101,9 @@ runServer = do
              , dhCPRG = cprg
              }
 
-           return $ DhResponse svPub
+           return $ Response $ toJSON svPub
 
-        sign DhSignRequest {..} = liftIO $ do
+        cmd DhCmdRequest {..} = liftIO $ do
           st' <- readIORef st
 
           let (lru', shared') = LRU.delete dhClSgnUser $ dhLRU st'
@@ -130,12 +129,17 @@ runServer = do
 
               verifyUserKey' pubkey = verify hashDescrSHA1 pubkey (BC.pack $ show shared) sig
 
-          sid <- authUserByUserData bck dhClSgnUser verifyUserKey 0
-          exec bck dhClCommand dhClOptions
+              exec
+                | Just cmd' <- cmd, Left f <- cmdFn cmd' = maybe (return $ Fail NoSuchCommandError) ($ bck) $ runReaderT f dhClOptions
+                | otherwise = return $ Fail NoSuchCommandError
+                where
+                  cmd = lookup dhClCommand cmds
 
-          let result | algo /= BC.pack "ssh-rsa" = SignNotOk "algo-not-ssh-rsa"
-                     | Just _ <- sid = SignOk
-                     | otherwise = SignNotOk "verify"
+          sid <- authUserByUserData bck dhClSgnUser verifyUserKey 0
+
+          let result | algo /= BC.pack "ssh-rsa" = Fail SignAlgoNotSshRsa
+                     | Just _ <- sid = Ok
+                     | otherwise = Fail SignVerify
 
           return result
 
@@ -144,3 +148,8 @@ runServer = do
           readIORef st >>= print . dhLRU
           return ()
 #endif
+
+main :: IO ()
+main = do
+  bck <- connectPostgreSQL ""
+  runServer bck cmds
