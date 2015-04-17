@@ -45,6 +45,8 @@ import           Network.Wai.Handler.Warp
 import           Web.Stripe
 import           Web.Stripe.Plan
 
+import           System.Environment
+
 import           Command
 import           Commands
 import           Model
@@ -106,7 +108,7 @@ runServer bck cmds = do
         cmd DhCmdRequest {..} = liftIO $ do
           st' <- readIORef st
 
-          let (lru', shared') = LRU.delete dhClSgnUser $ dhLRU st'
+          let (lru', shared') = LRU.delete dhClUser $ dhLRU st'
 
           writeIORef st $ st' { dhLRU = lru' }
 
@@ -121,9 +123,12 @@ runServer bck cmds = do
 
               Just cmd = lookup dhClCommand cmds
 
-              auth | Just clPass <- dhClPass = authUser bck dhClSgnUser (PasswordPlain clPass) 0
+              sessionTime = 10000000
+
+              auth | Just clPass <- dhClPass = authUser bck dhClUser (PasswordPlain clPass) sessionTime
                    | Just (clKeyHash, clSig) <- dhClSig
-                   , Right (algo, sig, shared) <- getSig clSig = authUserByUserData bck dhClSgnUser (verifyUserKey clKeyHash sig shared) 0
+                   , Right (algo, sig, shared) <- getSig clSig = authUserByUserData bck dhClUser (verifyUserKey clKeyHash sig shared) sessionTime
+                   | otherwise = return Nothing
                 where
                   getSig clSig = flip runGet clBlob $ do
                     al   <- fromIntegral <$> getWord32be
@@ -138,9 +143,12 @@ runServer bck cmds = do
               exec
                 | Left f <- cmdFn cmd = maybe (return $ Fail NoSuchCommandError) ($ bck) $ runReaderT f dhClOptions
                 | Right f <- cmdFn cmd = do
+                    -- FIXME: pattern matches
                     Just sid <- auth
                     Just uid <- verifySession bck sid 0
-                    maybe (return $ Fail NoSuchCommandError) (\f -> f uid bck) $ runReaderT f dhClOptions
+                    r <- maybe (return $ Fail NoSuchCommandError) (\f -> f uid bck) $ runReaderT f dhClOptions
+                    destroySession bck sid
+                    return r
 
           exec
 
@@ -152,5 +160,7 @@ runServer bck cmds = do
 
 main :: IO ()
 main = do
-  bck <- connectPostgreSQL ""
+  dburl <- fromMaybe "" <$> lookupEnv "DATABASE_URL"
+  bck <- connectPostgreSQL $ BC.pack dburl
+  housekeepBackend bck
   runServer bck cmds

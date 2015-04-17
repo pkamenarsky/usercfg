@@ -42,11 +42,13 @@ object' = object . filter (not . isDflt . snd)
     isDflt _          = False
 
 instance ToJSON a => ToJSON (Option a) where
-  toJSON (Option {..}) = object'
-    [ "name"        .= optName
-    , "description" .= optDesc
-    , "default"     .= optDefault
-    ]
+  toJSON Option {..}
+    | optName == "" = Null
+    | otherwise = object'
+      [ "name"        .= optName
+      , "description" .= optDesc
+      , "default"     .= optDefault
+      ]
 
 emptyOption :: Option a
 emptyOption = Option { optName = "", optDesc = "", optDefault = Nothing, optResolve = undefined }
@@ -81,7 +83,7 @@ data Command bck r = forall opts. ToJSON opts => Command
   }
 
 instance ToJSON (Command bck r) where
-  toJSON (Command {..}) = object
+  toJSON (Command {..}) = object'
     [ "name"    .= cmdName
     , "options" .= cmdOpts
     , "confirm" .= cmdConfirm
@@ -97,7 +99,7 @@ instance ToJSON a => ToJSON (OneTuple a) where
   toJSON (OneTuple a) = toJSON a
 
 noArgs :: Data.Tuple.OneTuple.OneTuple (Option (Maybe ()))
-noArgs = OneTuple $ optMay "" "" Nothing :: OneTuple (Option (Maybe ()))
+noArgs = OneTuple $ optMay "" "" Nothing
 
 apply :: (Monad m, SequenceT a (m b), Curry (b -> c) d)  => a -> d -> m c
 apply opts f = sequenceT opts >>= return . uncurryN f
