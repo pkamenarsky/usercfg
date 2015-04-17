@@ -72,8 +72,8 @@ data DhData = DhData
 
 type DhState = IORef DhData
 
-runServer :: UserStorageBackend bck => bck -> [(T.Text, Command bck (IO Response))] -> IO ()
-runServer bck cmds = do
+runServer :: UserStorageBackend bck => Int -> bck -> [(T.Text, Command bck (IO Response))] -> IO ()
+runServer port bck cmds = do
   ep  <- createEntropyPool
   st  <- newIORef $ DhData (LRU.newLRU $ Just 10000) (cprgCreate ep)
 
@@ -81,7 +81,7 @@ runServer bck cmds = do
 
   runServer' bck st
   where
-    runServer' bck st = run 8000 $ serve api $ info
+    runServer' bck st = run port $ serve api $ info
                                       :<|> dh
                                       :<|> cmd
 #ifdef DEBUG
@@ -161,6 +161,9 @@ runServer bck cmds = do
 main :: IO ()
 main = do
   dburl <- fromMaybe "" <$> lookupEnv "DATABASE_URL"
+  port <- read . fromMaybe "8000" <$> lookupEnv "PORT"
+
   bck <- connectPostgreSQL $ BC.pack dburl
   housekeepBackend bck
-  runServer bck cmds
+
+  runServer port bck cmds
