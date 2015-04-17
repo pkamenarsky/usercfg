@@ -99,7 +99,7 @@ instance ToJSON a => ToJSON (OneTuple a) where
   toJSON (OneTuple a) = toJSON a
 
 noArgs :: Data.Tuple.OneTuple.OneTuple (Option (Maybe ()))
-noArgs = OneTuple emptyOption
+noArgs = OneTuple $ optMay "" "" Nothing
 
 apply :: (Monad m, SequenceT a (m b), Curry (b -> c) d)  => a -> d -> m c
 apply opts f = sequenceT opts >>= return . uncurryN f

@@ -45,6 +45,8 @@ import           Network.Wai.Handler.Warp
 import           Web.Stripe
 import           Web.Stripe.Plan
 
+import           System.Environment
+
 import           Command
 import           Commands
 import           Model
@@ -158,6 +160,7 @@ runServer bck cmds = do
 
 main :: IO ()
 main = do
-  bck <- connectPostgreSQL ""
+  dburl <- fromMaybe "" <$> lookupEnv "DATABASE_URL"
+  bck <- connectPostgreSQL $ BC.pack dburl
   housekeepBackend bck
   runServer bck cmds
