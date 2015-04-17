@@ -44,6 +44,7 @@ cmds =
   [ cmdCreateUser
   , cmdAuth "delete-user" True noArgs $ \_ uid bck -> deleteUser bck uid >> return Ok
   , cmdAuth "ping" True noArgs $ \_ uid bck -> return $ Response "pong"
+  , cmd "ping2" True noArgs $ \_ bck -> return $ Response "pong2"
   ]
 
 exec :: UserStorageBackend bck => bck -> T.Text -> Keys -> IO Response

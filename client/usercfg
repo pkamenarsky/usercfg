@@ -38,7 +38,8 @@ with open(home + '/.ssh/id_rsa.pub', 'r') as content_file:
 
 sig = base64.b64encode(keys[0].sign_ssh_data(str(shared)))
 
-response = urllib2.urlopen('http://localhost:8000/cmd', json.dumps({ 'cl-command' : 'ping', 'cl-options': [['a', 'b']], 'cl-sig' : [pubkeySha1, sig], 'cl-user': 'phil' }))
+# response = urllib2.urlopen('http://localhost:8000/cmd', json.dumps({ 'cl-command' : 'ping', 'cl-options': [['a', 'b']], 'cl-sig' : [pubkeySha1, sig], 'cl-user': 'phil' }))
+response = urllib2.urlopen('http://localhost:8000/cmd', json.dumps({ 'cl-command' : 'ping2', 'cl-options': [['a', 'b']], 'cl-user': 'phil' }))
 svSignResponse = json.load(response)
 
 print(svSignResponse)
