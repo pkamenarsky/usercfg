@@ -20,11 +20,11 @@ import           Command
 
 cmdCreateUser :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
 cmdCreateUser = cmd "create-user" False
-    ( opt    "name" "User name"
-    , opt    "email" "User mail"
-    , opt    "password" "User password"
-    , optMay "number" "User number" Nothing
-    , optMay "ssh-key" "SSH public key" Nothing
+    ( opt    "name" "n" "User name" None
+    , opt    "email" "e" "User mail" None
+    , opt    "password" "p" "User password" None
+    , optMay "number" "N" "User number" None Nothing
+    , optMay "ssh-key" "S" "SSH public key" None Nothing
     ) $ \u_name u_email password usrNumber sshKey bck -> do
         let sshKeyHash =  maybe "" (TE.decodeUtf8 . B16.encode . H.hash . TE.encodeUtf8) sshKey
 
