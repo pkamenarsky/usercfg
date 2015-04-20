@@ -7,9 +7,7 @@ import           Control.Monad
 import           Control.Monad.Reader
 
 import           Data.Aeson
-import           Data.Aeson.Types
 import qualified Data.Text            as T
-import           Data.Maybe
 
 import           Data.Tuple.Curry
 import           Data.Tuple.OneTuple
@@ -18,9 +16,6 @@ import           Data.Tuple.Sequence
 import qualified Data.Vector          as V
 
 import           Web.Users.Types
-import           Web.PathPieces
-
-import           Model
 
 type Keys = [(T.Text, T.Text)]
 

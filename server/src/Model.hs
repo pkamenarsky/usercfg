@@ -18,6 +18,7 @@ mkProxy _ = Proxy
 data Error = forall e. ToJSON e => UserStorageBackendError e
            | InvalidUserError
            | NoSuchCommandError
+           | MissingOptionsError
            | SignAlgoNotSshRsa
            | SignVerify
 
