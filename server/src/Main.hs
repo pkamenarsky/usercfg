@@ -4,6 +4,8 @@ module Main where
 
 import           Control.Applicative
 import           Control.Monad
+import           Control.Monad.Identity
+import           Control.Monad.Trans.Either
 import           Control.Monad.Reader
 
 import           Crypto.PubKey.OpenSsh
@@ -31,6 +33,7 @@ import           Servant.API
 import           Servant.Server
 
 import           Web.Users.Types
+import           Web.Users.Postgresql
 
 import qualified Data.Text                as T
 
@@ -129,6 +132,13 @@ runServer port bck cmds = do
                       where
                         Just (SharedKey shared) = shared'
                         Right clBlob = B64.decode $ TE.encodeUtf8 clSig
+
+              auth2 = runIdentity $ runEitherT $ do
+                shared'' <- getShared shared'
+                return Ok
+                  where
+                    getShared (Just (SharedKey x)) = right x
+                    getShared _                    = left $ Fail MissingOptionsError
 
               exec cmd
                 | Left f <- cmdFn cmd = maybe (return $ Fail MissingOptionsError) ($ bck) $ runReaderT f dhClOptions

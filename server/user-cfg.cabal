@@ -48,6 +48,7 @@ executable user-cfg
                        crypto-random,
                        crypto-pubkey-types,
                        cryptohash,
+                       either,
                        lrucache,
                        mtl,
                        OneTuple,

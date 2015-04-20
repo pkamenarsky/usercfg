@@ -7,13 +7,14 @@ import           Control.Monad
 import           Control.Monad.Reader
 
 import           Data.Aeson
-import qualified Data.Text            as T
+import           Data.Either.Combinators  (isLeft)
+import qualified Data.Text                as T
 
 import           Data.Tuple.Curry
 import           Data.Tuple.OneTuple
 import           Data.Tuple.Sequence
 
-import qualified Data.Vector          as V
+import qualified Data.Vector              as V
 
 import           Web.Users.Types
 
@@ -95,8 +96,6 @@ instance ToJSON (Command bck r) where
     , "confirm" .= cmdConfirm
     , "auth"    .= isLeft cmdFn
     ]
-    where isLeft e | Left _ <- e = False
-                   | otherwise   = True
 
 instance FromJSON a => FromJSON (OneTuple a) where
   parseJSON a = OneTuple <$> parseJSON a
