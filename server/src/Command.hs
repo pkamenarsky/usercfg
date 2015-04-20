@@ -26,10 +26,14 @@ type Keys = [(T.Text, T.Text)]
 
 type Resolve a = ReaderT Keys Maybe a
 
+data Prompt = None | Prompt | Invisible
+
 data Option a = Option
   { optName     :: T.Text
+  , optShort    :: T.Text
   , optDesc     :: T.Text
   , optDefault  :: Maybe a
+  , optPrompt   :: Prompt
   , optResolve  :: Resolve a
   } deriving Functor
 
@@ -41,17 +45,24 @@ object' = object . filter (not . isDflt . snd)
     isDflt (Array a)  = V.null a
     isDflt _          = False
 
+instance ToJSON Prompt where
+  toJSON None      = "none"
+  toJSON Prompt    = "prompt"
+  toJSON Invisible = "invisible"
+
 instance ToJSON a => ToJSON (Option a) where
   toJSON Option {..}
     | optName == "" = Null
     | otherwise = object'
       [ "name"        .= optName
+      , "short"       .= optShort
       , "description" .= optDesc
       , "default"     .= optDefault
+      , "prompt"      .= optPrompt
       ]
 
 emptyOption :: Option a
-emptyOption = Option { optName = "", optDesc = "", optDefault = Nothing, optResolve = undefined }
+emptyOption = Option { optName = "", optShort = "", optDesc = "", optPrompt = None, optDefault = Nothing, optResolve = undefined }
 
 instance Applicative Option where
   pure  = return
@@ -61,15 +72,15 @@ instance Monad Option where
   return x = emptyOption { optResolve = return x }
   v >>= f  = emptyOption { optResolve = optResolve v >>= (optResolve <$> f) }
 
-opt :: Read a => T.Text -> T.Text -> Option a
-opt optName optDesc = Option
+opt :: Read a => T.Text -> T.Text -> T.Text -> Prompt -> Option a
+opt optName optShort optDesc optPrompt = Option
   { optResolve = ReaderT $ \keys -> read . T.unpack <$> lookup optName keys
   , optDefault = Nothing
   , ..
   }
 
-optMay :: Read a => T.Text -> T.Text -> Maybe a -> Option (Maybe a)
-optMay optName optDesc optDefault' = Option
+optMay :: Read a => T.Text -> T.Text -> T.Text -> Prompt -> Maybe a -> Option (Maybe a)
+optMay optName optShort optDesc optPrompt optDefault' = Option
   { optResolve = ReaderT $ \keys -> (read . T.unpack <$> lookup optName keys) <|> Just optDefault'
   , optDefault = Just optDefault'
   , ..
@@ -99,7 +110,7 @@ instance ToJSON a => ToJSON (OneTuple a) where
   toJSON (OneTuple a) = toJSON a
 
 noArgs :: Data.Tuple.OneTuple.OneTuple (Option (Maybe ()))
-noArgs = OneTuple $ optMay "" "" Nothing
+noArgs = OneTuple $ optMay "" "" "" None Nothing
 
 apply :: (Monad m, SequenceT a (m b), Curry (b -> c) d)  => a -> d -> m c
 apply opts f = sequenceT opts >>= return . uncurryN f

@@ -88,8 +88,7 @@ runServer port bck cmds = do
                                       :<|> printState
 #endif
       where
-        info = do
-          return $ Response $ toJSON cmds
+        info = return $ Response $ toJSON cmds
 
         dh DhRequest {..} = liftIO $ do
            st' <- readIORef st
