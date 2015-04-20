@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, OverloadedStrings, TemplateHaskell #-}
+{-# LANGUAGE CPP, ExistentialQuantification, OverloadedStrings, TemplateHaskell #-}
 
 module Model where
 
@@ -18,9 +18,13 @@ mkProxy _ = Proxy
 data Error = forall e. ToJSON e => UserStorageBackendError e
            | InvalidUserError
            | NoSuchCommandError
+           | ParseError String
+           | NoSharedKeyError
+           | PubKeyFormatError
+           | NoPubKeyError
            | MissingOptionsError
-           | SignAlgoNotSshRsa
-           | SignVerify
+           | SignVerifyError
+           | AuthError
 
 instance ToJSON CreateUserError where
   toJSON UsernameOrEmailAlreadyTaken = A.String "create_user_user_or_email_taken"
@@ -34,11 +38,26 @@ instance ToJSON TokenError where
   toJSON _ = A.String "token"
 
 instance ToJSON Error where
-  toJSON (UserStorageBackendError e) = toJSON e
-  toJSON InvalidUserError            = A.String "invalid_user"
-  toJSON NoSuchCommandError          = A.String "no_such_command"
-  toJSON SignAlgoNotSshRsa           = A.String "algo-not-ssh-rsa"
-  toJSON SignVerify                  = A.String "verify"
+  toJSON (UserStorageBackendError e) = object [ "code" .= toJSON e ]
+  toJSON NoSuchCommandError          = object [ "code" .= A.String "no_such_command" ]
+  toJSON MissingOptionsError         = object [ "code" .= A.String "missing_options" ]
+#ifdef DEBUG
+  toJSON InvalidUserError            = object [ "code" .= A.String "invalid_user" ]
+  toJSON (ParseError e)              = object [ "code" .= A.String "parse_error", "reason" .= A.String (T.pack e) ]
+  toJSON NoSharedKeyError            = object [ "code" .= A.String "no_shared_key" ]
+  toJSON PubKeyFormatError           = object [ "code" .= A.String "pubkey_format_error" ]
+  toJSON NoPubKeyError               = object [ "code" .= A.String "no_pubkey" ]
+  toJSON SignVerifyError             = object [ "code" .= A.String "verify" ]
+  toJSON AuthError                   = object [ "code" .= A.String "auth" ]
+#else
+  toJSON InvalidUserError            = object [ "code" .= A.String "auth" ]
+  toJSON (ParseError _)              = object [ "code" .= A.String "auth" ]
+  toJSON NoSharedKeyError            = object [ "code" .= A.String "auth" ]
+  toJSON PubKeyFormatError           = object [ "code" .= A.String "auth" ]
+  toJSON NoPubKeyError               = object [ "code" .= A.String "auth" ]
+  toJSON SignVerifyError             = object [ "code" .= A.String "auth" ]
+  toJSON AuthError                   = object [ "code" .= A.String "auth" ]
+#endif
 
 data UserData = UserData
   { usrNumber  :: Maybe T.Text

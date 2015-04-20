@@ -20,6 +20,7 @@ import qualified Data.ByteString          as B
 import qualified Data.ByteString.Base64   as B64
 import qualified Data.ByteString.Char8    as BC
 import qualified Data.Cache.LRU           as LRU
+import           Data.Either.Combinators
 import           Data.IORef
 import qualified Data.Map               as M
 import           Data.Maybe
@@ -67,6 +68,41 @@ data DhData = DhData
 
 type DhState = IORef DhData
 
+mbToE _ (Just x) = Right x
+mbToE e Nothing  = Left e
+
+mbToET _ (Just x) = right x
+mbToET e Nothing  = left e
+
+authPubKey :: Maybe SharedKey -> T.Text -> T.Text -> M.Map T.Text T.Text -> Either Response ()
+authPubKey shared sshHash sigBlob usrSshKeys = runIdentity $ runEitherT $ do
+  shared'  <- getShared shared
+  blob     <- getBlob $ B64.decode $ TE.encodeUtf8 sigBlob
+
+  pubkey   <- mbToET (Fail NoPubKeyError) $ M.lookup sshHash usrSshKeys
+  pubkey'  <- getPubKey $ decodePublic $ TE.encodeUtf8 pubkey
+
+  (_, sig) <- hoistEither $ mapLeft (Fail . ParseError) $ flip runGet blob $ do
+    al   <- fromIntegral <$> getWord32be
+    algo <- B.pack <$> replicateM al getWord8
+    sl   <- fromIntegral <$> getWord32be
+    sig  <- B.pack <$> replicateM sl getWord8
+    return (algo, sig)
+
+  if verify hashDescrSHA1 pubkey' (BC.pack $ show shared') sig
+    then right ()
+    else left $ Fail SignVerifyError
+
+    where
+      getShared (Just (SharedKey x)) = right x
+      getShared _                    = left $ Fail NoSharedKeyError
+
+      getBlob (Right x) = right x
+      getBlob _         = left $ Fail $ ParseError "b64"
+
+      getPubKey (Right (OpenSshPublicKeyRsa x _)) = right x
+      getPubKey _                                 = left $ Fail PubKeyFormatError
+
 runServer :: UserStorageBackend bck => Int -> bck -> [(T.Text, Command bck (IO Response))] -> IO ()
 runServer port bck cmds = do
   ep  <- createEntropyPool
@@ -102,57 +138,34 @@ runServer port bck cmds = do
         cmd DhCmdRequest {..} = liftIO $ do
           st' <- readIORef st
 
-          let (lru', shared') = LRU.delete dhClUser $ dhLRU st'
+          let (lru', shared) = LRU.delete dhClUser $ dhLRU st'
 
           writeIORef st $ st' { dhLRU = lru' }
 
-          let verifyUserKey clKeyHash clSig shared UserData {..}
-                | Just  key <- M.lookup clKeyHash usrSshKeys
-                , Right (OpenSshPublicKeyRsa pubkey _) <- decodePublic $ TE.encodeUtf8 key
-                    = verifyUserKey' clSig shared pubkey
-                | otherwise = False
+          let sessionTime = 10000000
 
-              verifyUserKey' sig shared pubkey = verify hashDescrSHA1 pubkey (BC.pack $ show shared) sig
-
-              sessionTime = 10000000
-
-              auth | Just clPass <- dhClPass
-                     = authUser bck dhClUser (PasswordPlain clPass) sessionTime
-                   | Just (clKeyHash, clSig)   <- dhClSig
-                   , Right (algo, sig, shared) <- getSig clSig
-                     = authUserByUserData bck dhClUser (verifyUserKey clKeyHash sig shared) sessionTime
-                   | otherwise = return Nothing
-                where
-                  getSig clSig = flip runGet clBlob $ do
-                    al   <- fromIntegral <$> getWord32be
-                    algo <- B.pack <$> replicateM al getWord8
-                    sl   <- fromIntegral <$> getWord32be
-                    sig  <- B.pack <$> replicateM sl getWord8
-                    return (algo, sig, shared)
-                      where
-                        Just (SharedKey shared) = shared'
-                        Right clBlob = B64.decode $ TE.encodeUtf8 clSig
-
-              auth2 = runIdentity $ runEitherT $ do
-                shared'' <- getShared shared'
-                return Ok
-                  where
-                    getShared (Just (SharedKey x)) = right x
-                    getShared _                    = left $ Fail MissingOptionsError
+              auth
+                | Just clPass <- dhClPass
+                  = mbToE (Fail AuthError) <$> authUser bck dhClUser (PasswordPlain clPass) sessionTime
+                | Just (keyHash, sig) <- dhClSig
+                  = mapLeft (fromMaybe (Fail AuthError)) <$> authUserByUserData bck dhClUser (\u -> authPubKey shared keyHash sig (usrSshKeys u)) sessionTime
+                | otherwise = return $ Left $ Fail AuthError
 
               exec cmd
                 | Left f <- cmdFn cmd = maybe (return $ Fail MissingOptionsError) ($ bck) $ runReaderT f dhClOptions
                 | Right f <- cmdFn cmd = do
-                    -- FIXME: pattern matches
-                    Just sid <- auth
+                    Right sid <- auth
+                    {-
                     Just uid <- verifySession bck sid 0
-                    r <- maybe (return $ Fail MissingOptionsError) (\f -> f uid bck) $ runReaderT f dhClOptions
+                    Just r <- (\f -> f uid bck) <$> runReaderT f dhClOptions
                     destroySession bck sid
-                    return r
+                    -}
+                    return $ Ok
 
               execCmd
                 | Just cmd <- lookup dhClCommand cmds
-                  = exec cmd
+                  -- = either return return $ exec cmd
+                  = undefined
                 | otherwise
                   = return $ Fail NoSuchCommandError
 
