@@ -7,22 +7,16 @@ import           Control.Monad
 import           Control.Monad.Reader
 
 import           Data.Aeson
-import           Data.Aeson.Types
-import qualified Data.Text            as T
-import           Data.Maybe
+import           Data.Either.Combinators  (isLeft)
+import qualified Data.Text                as T
 
 import           Data.Tuple.Curry
 import           Data.Tuple.OneTuple
 import           Data.Tuple.Sequence
 
-import qualified Data.Vector          as V
-
 import           Web.Users.Types
-import           Web.PathPieces
 
 import           Model
-
-type Keys = [(T.Text, T.Text)]
 
 type Resolve a = ReaderT Keys Maybe a
 
@@ -36,14 +30,6 @@ data Option a = Option
   , optPrompt   :: Prompt
   , optResolve  :: Resolve a
   } deriving Functor
-
-object' :: [(T.Text, Value)] -> Value
-object' = object . filter (not . isDflt . snd)
-  where
-    isDflt Null       = True
-    isDflt (Bool b)   = not b
-    isDflt (Array a)  = V.null a
-    isDflt _          = False
 
 instance ToJSON Prompt where
   toJSON None      = "none"
@@ -100,8 +86,6 @@ instance ToJSON (Command bck r) where
     , "confirm" .= cmdConfirm
     , "auth"    .= isLeft cmdFn
     ]
-    where isLeft e | Left _ <- e = False
-                   | otherwise   = True
 
 instance FromJSON a => FromJSON (OneTuple a) where
   parseJSON a = OneTuple <$> parseJSON a

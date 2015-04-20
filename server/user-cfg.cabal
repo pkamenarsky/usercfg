@@ -15,7 +15,24 @@ build-type:          Simple
 -- extra-source-files:  
 cabal-version:       >=1.10
 
+flag debug
+  description: enable debug output
+  default: True
+
+flag devel
+  description: enable development mode (i.e. disable -Werror)
+  default: False
+
 executable user-cfg
+  if flag(debug)
+    cpp-options: -DDEBUG
+
+  if !flag(devel)
+    ghc-options: -Werror
+
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-identities
+               -fno-warn-unused-do-bind -fno-warn-orphans
+               -funbox-strict-fields
   main-is:             Main.hs
   -- other-modules:       
   -- other-extensions:    
@@ -31,6 +48,7 @@ executable user-cfg
                        crypto-random,
                        crypto-pubkey-types,
                        cryptohash,
+                       either,
                        lrucache,
                        mtl,
                        OneTuple,
@@ -39,6 +57,7 @@ executable user-cfg
                        servant,
                        servant-server,
                        stripe-haskell,
+                       template-haskell,
                        text,
                        transformers,
                        tuple,
