@@ -135,21 +135,25 @@ runServer port bck cmds = do
 
           let (lru', shared) = LRU.delete dhClUser $ dhLRU st
 
+              mbToR r = maybe (return $ responseFail r)
+
               auth cmd
                 | Just clPass <- dhClPass = do
                     r <- withAuthUser bck dhClUser (PasswordPlain clPass) cmd
-                    maybe (return $ Left AuthError) return r
+                    mbToR AuthError return r
                 | Just (keyHash, sig) <- dhClSig = runEitherT $ do
                     f <- hoistEither $ authPubKey shared keyHash sig
-                    r <- liftIO $ withAuthUserByUserData bck dhClUser (f . usrSshKeys) cmd
+                    r <- liftIO
+                       $ withAuthUserByUserData bck dhClUser (f . usrSshKeys) cmd
                     hoistEither $ maybe (Left AuthError) id r
-                | otherwise = return $ Left AuthNeededError
+                | otherwise = return $ responseFail AuthNeededError
 
               exec cmd
                 | Left f  <- cmdFn cmd =
-                    maybe (return $ responseFail MissingOptionsError) ($ bck) $ runReaderT f dhClOptions
+                    mbToR MissingOptionsError ($ bck) $ runReaderT f dhClOptions
                 | Right f <- cmdFn cmd =
-                    auth $ \uid -> maybe (return $ responseFail MissingOptionsError) (\rsv -> rsv uid bck) $ runReaderT f dhClOptions
+                    auth $ \uid -> mbToR MissingOptionsError (\rsv -> rsv uid bck)
+                         $ runReaderT f dhClOptions
                 | otherwise = return $ responseFail NoSuchCommandError
 
               execCmd
