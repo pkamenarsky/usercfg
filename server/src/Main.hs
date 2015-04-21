@@ -25,7 +25,7 @@ import qualified Data.Map               as M
 import           Data.Maybe
 import           Data.Proxy
 import           Data.Serialize.Get       (getWord32be, getWord8, runGet)
-import qualified Data.Text.Encoding     as TE
+import qualified Data.Text.Encoding       as TE
 
 import           Database.PostgreSQL.Simple
 
@@ -33,7 +33,7 @@ import           Servant.API
 import           Servant.Server
 
 import           Web.Users.Types
-import           Web.Users.Postgresql
+import           Web.Users.Postgresql     ()
 
 import qualified Data.Text                as T
 
@@ -41,7 +41,7 @@ import           Network.Wai.Handler.Warp
 
 import           System.Environment
 
-import           Command
+import           Command                  (Command (..))
 import           Commands
 import           Model
 
@@ -52,7 +52,7 @@ params = Params
 
 type Api = "info" :> Get Response
       :<|> "dh" :> ReqBody DhRequest :> Post Response
-      :<|> "cmd" :> ReqBody DhCmdRequest :> Post Response
+      :<|> "command" :> ReqBody DhCmdRequest :> Post Response
 #ifdef DEBUG
       :<|> "print_state" :> Get ()
 #endif
@@ -67,15 +67,17 @@ data DhData = DhData
 
 type DhState = IORef DhData
 
+mbToE :: e -> Maybe a -> Either e a
 mbToE _ (Just x) = Right x
 mbToE e Nothing  = Left e
 
+mbToET :: Monad m => e -> Maybe a -> EitherT e m a
 mbToET _ (Just x) = right x
 mbToET e Nothing  = left e
 
 authPubKey :: Maybe SharedKey -> T.Text -> T.Text -> Either Error (M.Map T.Text T.Text -> Bool)
 authPubKey shared sshHash sigBlob = do
-  shared'  <- getShared shared
+  shared'  <- unpackShared shared
   blob     <- mapLeft (const $ ParseError "b64") $ B64.decode $ TE.encodeUtf8 sigBlob
 
   (_, sig) <- mapLeft ParseError $ flip runGet blob $ do
@@ -87,86 +89,86 @@ authPubKey shared sshHash sigBlob = do
 
   Right $ \sshKeys ->
       let pubkey  = M.lookup sshHash sshKeys
-          pubkey' = join $ getPubKey . decodePublic . TE.encodeUtf8 <$> pubkey
+          pubkey' = join $ unpackPubKey . decodePublic . TE.encodeUtf8 <$> pubkey
       in fromMaybe False $ verify hashDescrSHA1 <$> pubkey' <*> pure (BC.pack $ show shared') <*> pure sig
     where
-      getShared (Just (SharedKey x)) = Right x
-      getShared _                    = Left NoSharedKeyError
+      unpackShared (Just (SharedKey x)) = Right x
+      unpackShared _                    = Left NoSharedKeyError
 
-      getPubKey (Right (OpenSshPublicKeyRsa x _)) = Just x
-      getPubKey _                                 = Nothing
+      unpackPubKey (Right (OpenSshPublicKeyRsa x _)) = Just x
+      unpackPubKey _                                 = Nothing
 
 runServer :: UserStorageBackend bck => Int -> bck -> [(T.Text, Command bck (IO Response))] -> IO ()
 runServer port bck cmds = do
-  ep  <- createEntropyPool
-  st  <- newIORef $ DhData (LRU.newLRU $ Just 10000) (cprgCreate ep)
+  ep    <- createEntropyPool
+  stref <- newIORef $ DhData (LRU.newLRU $ Just 10000) (cprgCreate ep)
 
   initUserBackend bck
 
-  runServer' st
+  runServer' stref
   where
-    runServer' st = run port $ serve api $ info
-                                      :<|> dh
-                                      :<|> cmd
+    runServer' stref = run port $ serve api $ info
+                                         :<|> dh
+                                         :<|> command
 #ifdef DEBUG
-                                      :<|> printState
+                                         :<|> printState
 #endif
       where
         info = return $ response $ toJSON cmds
 
         dh DhRequest {..} = liftIO $ do
-           st' <- readIORef st
+           st <- readIORef stref
 
-           let (priv, cprg)       = generatePrivate (dhCPRG st') params
+           let (priv, cprg)       = generatePrivate (dhCPRG st) params
                PublicNumber svPub = calculatePublic params priv
                shared             = getShared params priv (PublicNumber dhClPub)
 
-           modifyIORef st $ \st' -> st'
+           modifyIORef stref $ \st' -> st'
              { dhLRU  = LRU.insert dhReqUser shared $ dhLRU st'
              , dhCPRG = cprg
              }
 
            return $ response $ toJSON svPub
 
-        cmd DhCmdRequest {..} = liftIO $ do
-          st' <- readIORef st
+        command DhCmdRequest {..} = liftIO $ do
+          st <- readIORef stref
 
-          let (lru', shared) = LRU.delete dhClUser $ dhLRU st'
+          let (lru', shared) = LRU.delete dhClUser $ dhLRU st
 
-          writeIORef st $ st' { dhLRU = lru' }
-
-          let sessionTime = 10000000
+              sessionTime = 10000000
 
               auth :: EitherT Error IO SessionId
               auth
                 | Just clPass <- dhClPass
-                  = mbToET AuthError =<< liftIO (authUser bck dhClUser (PasswordPlain clPass) sessionTime)
+                  = mbToET AuthPassError =<< liftIO (authUser bck dhClUser (PasswordPlain clPass) sessionTime)
                 | Just (keyHash, sig) <- dhClSig = do
                     f <- hoistEither $ authPubKey shared keyHash sig
-                    mbToET AuthError =<< liftIO  (authUserByUserData bck dhClUser (f . usrSshKeys) sessionTime)
-                | otherwise = left AuthError
+                    mbToET AuthKeyError =<< liftIO  (authUserByUserData bck dhClUser (f . usrSshKeys) sessionTime)
+                | otherwise = left AuthNeededError
 
-              -- exec :: Command bck (IO Response) -> IO Response
               exec cmd
                 | Left f  <- cmdFn cmd = maybe (return $ responseFail MissingOptionsError) ($ bck) $ runReaderT f dhClOptions
                 | Right f <- cmdFn cmd = runEitherT $ do
                     sid <- auth
                     uid <- mbToET AuthError =<< liftIO (verifySession bck sid 0)
-                    r   <- liftIO (maybe (return $ responseFail MissingOptionsError) (\f -> f uid bck) $ runReaderT f dhClOptions)
+                    r   <- liftIO (maybe (return $ responseFail MissingOptionsError) (\rsv -> rsv uid bck) $ runReaderT f dhClOptions)
                     liftIO $ destroySession bck sid
                     hoistEither r
+                | otherwise = return $ responseFail NoSuchCommandError
 
               execCmd
                 | Just cmd <- lookup dhClCommand cmds
                   = exec cmd
                 | otherwise
-                  = return $ Left NoSuchCommandError
+                  = return $ responseFail NoSuchCommandError
+
+          writeIORef stref $ st { dhLRU = lru' }
 
           execCmd
 
 #ifdef DEBUG
         printState = liftIO $ do
-          readIORef st >>= print . dhLRU
+          readIORef stref >>= print . dhLRU
           return ()
 #endif
 

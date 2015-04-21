@@ -34,6 +34,9 @@ data Error = forall e. ToJSON e => UserStorageBackendError e
            | MissingOptionsError
            | SignVerifyError
            | AuthError
+           | AuthKeyError
+           | AuthPassError
+           | AuthNeededError
 
 instance ToJSON CreateUserError where
   toJSON UsernameOrEmailAlreadyTaken = A.String "create_user_user_or_email_taken"
@@ -58,6 +61,9 @@ instance ToJSON Error where
   toJSON NoPubKeyError               = object [ "code" .= A.String "no_pubkey" ]
   toJSON SignVerifyError             = object [ "code" .= A.String "verify" ]
   toJSON AuthError                   = object [ "code" .= A.String "auth" ]
+  toJSON AuthKeyError                = object [ "code" .= A.String "auth_key" ]
+  toJSON AuthPassError               = object [ "code" .= A.String "auth_pass" ]
+  toJSON AuthNeededError             = object [ "code" .= A.String "auth_needed" ]
 #else
   toJSON InvalidUserError            = object [ "code" .= A.String "auth" ]
   toJSON (ParseError _)              = object [ "code" .= A.String "auth" ]
@@ -66,6 +72,9 @@ instance ToJSON Error where
   toJSON NoPubKeyError               = object [ "code" .= A.String "auth" ]
   toJSON SignVerifyError             = object [ "code" .= A.String "auth" ]
   toJSON AuthError                   = object [ "code" .= A.String "auth" ]
+  toJSON AuthKeyError                = object [ "code" .= A.String "auth" ]
+  toJSON AuthPassError               = object [ "code" .= A.String "auth" ]
+  toJSON AuthNeededError             = object [ "code" .= A.String "auth" ]
 #endif
 
 data UserData = UserData
