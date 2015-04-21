@@ -21,6 +21,7 @@ import qualified Data.ByteString.Char8    as BC
 import qualified Data.Cache.LRU           as LRU
 import           Data.Either.Combinators
 import           Data.IORef
+import           Data.List
 import qualified Data.Map               as M
 import           Data.Maybe
 import           Data.Proxy
@@ -75,8 +76,8 @@ mbToET :: Monad m => e -> Maybe a -> EitherT e m a
 mbToET _ (Just x) = right x
 mbToET e Nothing  = left e
 
-authPubKey :: Maybe SharedKey -> T.Text -> T.Text -> Either Error (M.Map T.Text T.Text -> Bool)
-authPubKey shared sshHash sigBlob = do
+authPubKey :: Keys -> Maybe SharedKey -> T.Text -> T.Text -> Either Error (M.Map T.Text T.Text -> Bool)
+authPubKey keys shared sshHash sigBlob = do
   shared'  <- unpackShared shared
   blob     <- mapLeft (const $ ParseError "b64") $ B64.decode $ TE.encodeUtf8 sigBlob
 
@@ -90,13 +91,19 @@ authPubKey shared sshHash sigBlob = do
   Right $ \sshKeys ->
       let pubkey  = M.lookup sshHash sshKeys
           pubkey' = join $ unpackPubKey . decodePublic . TE.encodeUtf8 <$> pubkey
-      in fromMaybe False $ verify hashDescrSHA1 <$> pubkey' <*> pure (BC.pack $ show shared') <*> pure sig
+      in fromMaybe False $ verify hashDescrSHA1
+                       <$> pubkey'
+                       <*> pure ((BC.pack $ show shared') `B.append` keysHash keys)
+                       <*> pure sig
     where
       unpackShared (Just (SharedKey x)) = Right x
       unpackShared _                    = Left NoSharedKeyError
 
       unpackPubKey (Right (OpenSshPublicKeyRsa x _)) = Just x
       unpackPubKey _                                 = Nothing
+
+keysHash :: Keys -> B.ByteString
+keysHash = TE.encodeUtf8 . T.concat . sort . map (uncurry T.append)
 
 runServer :: UserStorageBackend bck => Int -> bck -> [(T.Text, Command bck (IO Response))] -> IO ()
 runServer port bck cmds = do
@@ -142,7 +149,7 @@ runServer port bck cmds = do
                     r <- withAuthUser bck dhClUser (PasswordPlain clPass) cmd
                     mbToR AuthError return r
                 | Just (keyHash, sig) <- dhClSig = runEitherT $ do
-                    f <- hoistEither $ authPubKey shared keyHash sig
+                    f <- hoistEither $ authPubKey dhClOptions shared keyHash sig
                     r <- liftIO
                        $ withAuthUserByUserData bck dhClUser (f . usrSshKeys) cmd
                     hoistEither $ maybe (Left AuthError) id r

@@ -24,6 +24,8 @@ object' = object . filter (not . isDflt . snd)
     isDflt (Array a)  = V.null a
     isDflt _          = False
 
+type Keys = [(T.Text, T.Text)]
+
 data Error = forall e. ToJSON e => UserStorageBackendError e
            | InvalidUserError
            | NoSuchCommandError
@@ -87,7 +89,7 @@ deriveJSON' "usr" ''UserData
 data DhRequest    = DhRequest    { dhReqUser   :: T.Text, dhClPub :: Integer } deriving Show
 data DhCmdRequest = DhCmdRequest { dhClUser    :: T.Text
                                  , dhClCommand :: T.Text
-                                 , dhClOptions :: [(T.Text, T.Text)]
+                                 , dhClOptions :: Keys
                                  , dhClPass    :: Maybe T.Text
                                  , dhClSig     :: Maybe (T.Text, T.Text)
                                  } deriving Show

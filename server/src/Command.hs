@@ -18,8 +18,6 @@ import           Web.Users.Types
 
 import           Model
 
-type Keys = [(T.Text, T.Text)]
-
 type Resolve a = ReaderT Keys Maybe a
 
 data Prompt = None | Prompt | Invisible
