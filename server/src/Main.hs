@@ -12,7 +12,6 @@ import           Crypto.PubKey.HashDescr
 import           Crypto.PubKey.RSA.PKCS15
 import           Crypto.PubKey.DH
 import           Crypto.Random
-import           Crypto.Types.PubKey.DH
 
 import           Data.Aeson
 import qualified Data.ByteString          as B
@@ -62,7 +61,7 @@ api :: Proxy Api
 api = Proxy
 
 data DhData = DhData
-  { dhLRU   :: LRU.LRU T.Text SharedKey
+  { dhLRU   :: LRU.LRU T.Text B.ByteString
   , dhCPRG  :: SystemRNG
   }
 
@@ -76,7 +75,7 @@ mbToET :: Monad m => e -> Maybe a -> EitherT e m a
 mbToET _ (Just x) = right x
 mbToET e Nothing  = left e
 
-authPubKey :: Keys -> Maybe SharedKey -> T.Text -> T.Text -> Either Error (M.Map T.Text T.Text -> Bool)
+authPubKey :: Keys -> Maybe B.ByteString -> T.Text -> T.Text -> Either Error (M.Map T.Text T.Text -> Bool)
 authPubKey keys shared sshHash sigBlob = do
   shared'  <- unpackShared shared
   blob     <- mapLeft (const $ ParseError "b64") $ B64.decode $ TE.encodeUtf8 sigBlob
@@ -96,8 +95,8 @@ authPubKey keys shared sshHash sigBlob = do
                        <*> pure ((BC.pack $ show shared') `B.append` keysHash keys)
                        <*> pure sig
     where
-      unpackShared (Just (SharedKey x)) = Right x
-      unpackShared _                    = Left NoSharedKeyError
+      unpackShared (Just x) = Right x
+      unpackShared _        = Left NoSharedKeyError
 
       unpackPubKey (Right (OpenSshPublicKeyRsa x _)) = Just x
       unpackPubKey _                                 = Nothing
@@ -126,16 +125,14 @@ runServer port bck cmds = do
         dh DhRequest {..} = liftIO $ do
            st <- readIORef stref
 
-           let (priv, cprg)       = generatePrivate (dhCPRG st) params
-               PublicNumber svPub = calculatePublic params priv
-               shared             = getShared params priv (PublicNumber dhClPub)
+           let (shared, cprg) = cprgGenerate 64 (dhCPRG st)
 
            modifyIORef stref $ \st' -> st'
              { dhLRU  = LRU.insert dhReqUser shared $ dhLRU st'
              , dhCPRG = cprg
              }
 
-           return $ response $ toJSON svPub
+           return $ response $ toJSON $ B.unpack $ B64.encode shared
 
         command DhCmdRequest {..} = liftIO $ do
           st <- readIORef stref
