@@ -24,7 +24,7 @@ cmdCreateUser = cmd "create-user" False
     ) $ \u_name u_email password usrNumber sshKey bck -> do
         let sshKeyHash =  maybe "" (TE.decodeUtf8 . B16.encode . H.hash . TE.encodeUtf8) sshKey
 
-        either (return . Fail . UserStorageBackendError) (const $ return Ok) =<<
+        either (return . responseFail . UserStorageBackendError) (const $ return responseOk) =<<
           createUser bck (User
             { u_active = True
             , u_more   = UserData
@@ -38,5 +38,5 @@ cmdCreateUser = cmd "create-user" False
 commands :: UserStorageBackend bck => [(T.Text, Command bck (IO Response))]
 commands =
   [ cmdCreateUser
-  , cmdAuth "delete-user" True noArgs $ \_ uid bck -> deleteUser bck uid >> return Ok
+  , cmdAuth "delete-user" True noArgs $ \_ uid bck -> deleteUser bck uid >> return responseOk
   ]

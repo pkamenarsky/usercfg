@@ -4,7 +4,6 @@ module Main where
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Identity
 import           Control.Monad.Trans.Either
 import           Control.Monad.Reader
 
@@ -74,34 +73,28 @@ mbToE e Nothing  = Left e
 mbToET _ (Just x) = right x
 mbToET e Nothing  = left e
 
-authPubKey :: Maybe SharedKey -> T.Text -> T.Text -> M.Map T.Text T.Text -> Either Response ()
-authPubKey shared sshHash sigBlob usrSshKeys = runIdentity $ runEitherT $ do
+authPubKey :: Maybe SharedKey -> T.Text -> T.Text -> Either Error (M.Map T.Text T.Text -> Bool)
+authPubKey shared sshHash sigBlob = do
   shared'  <- getShared shared
-  blob     <- getBlob $ B64.decode $ TE.encodeUtf8 sigBlob
+  blob     <- mapLeft (const $ ParseError "b64") $ B64.decode $ TE.encodeUtf8 sigBlob
 
-  pubkey   <- mbToET (Fail NoPubKeyError) $ M.lookup sshHash usrSshKeys
-  pubkey'  <- getPubKey $ decodePublic $ TE.encodeUtf8 pubkey
-
-  (_, sig) <- hoistEither $ mapLeft (Fail . ParseError) $ flip runGet blob $ do
+  (_, sig) <- mapLeft ParseError $ flip runGet blob $ do
     al   <- fromIntegral <$> getWord32be
     algo <- B.pack <$> replicateM al getWord8
     sl   <- fromIntegral <$> getWord32be
     sig  <- B.pack <$> replicateM sl getWord8
     return (algo, sig)
 
-  if verify hashDescrSHA1 pubkey' (BC.pack $ show shared') sig
-    then right ()
-    else left $ Fail SignVerifyError
-
+  Right $ \sshKeys ->
+      let pubkey  = M.lookup sshHash sshKeys
+          pubkey' = join $ getPubKey . decodePublic . TE.encodeUtf8 <$> pubkey
+      in fromMaybe False $ verify hashDescrSHA1 <$> pubkey' <*> pure (BC.pack $ show shared') <*> pure sig
     where
-      getShared (Just (SharedKey x)) = right x
-      getShared _                    = left $ Fail NoSharedKeyError
+      getShared (Just (SharedKey x)) = Right x
+      getShared _                    = Left NoSharedKeyError
 
-      getBlob (Right x) = right x
-      getBlob _         = left $ Fail $ ParseError "b64"
-
-      getPubKey (Right (OpenSshPublicKeyRsa x _)) = right x
-      getPubKey _                                 = left $ Fail PubKeyFormatError
+      getPubKey (Right (OpenSshPublicKeyRsa x _)) = Just x
+      getPubKey _                                 = Nothing
 
 runServer :: UserStorageBackend bck => Int -> bck -> [(T.Text, Command bck (IO Response))] -> IO ()
 runServer port bck cmds = do
@@ -119,7 +112,7 @@ runServer port bck cmds = do
                                       :<|> printState
 #endif
       where
-        info = return $ Response $ toJSON cmds
+        info = return $ response $ toJSON cmds
 
         dh DhRequest {..} = liftIO $ do
            st' <- readIORef st
@@ -133,7 +126,7 @@ runServer port bck cmds = do
              , dhCPRG = cprg
              }
 
-           return $ Response $ toJSON svPub
+           return $ response $ toJSON svPub
 
         cmd DhCmdRequest {..} = liftIO $ do
           st' <- readIORef st
@@ -144,30 +137,30 @@ runServer port bck cmds = do
 
           let sessionTime = 10000000
 
+              auth :: EitherT Error IO SessionId
               auth
                 | Just clPass <- dhClPass
-                  = mbToE (Fail AuthError) <$> authUser bck dhClUser (PasswordPlain clPass) sessionTime
-                | Just (keyHash, sig) <- dhClSig
-                  = mapLeft (fromMaybe (Fail AuthError)) <$> authUserByUserData bck dhClUser (\u -> authPubKey shared keyHash sig (usrSshKeys u)) sessionTime
-                | otherwise = return $ Left $ Fail AuthError
+                  = mbToET AuthError =<< liftIO (authUser bck dhClUser (PasswordPlain clPass) sessionTime)
+                | Just (keyHash, sig) <- dhClSig = do
+                    f <- hoistEither $ authPubKey shared keyHash sig
+                    mbToET AuthError =<< liftIO  (authUserByUserData bck dhClUser (f . usrSshKeys) sessionTime)
+                | otherwise = left AuthError
 
+              -- exec :: Command bck (IO Response) -> IO Response
               exec cmd
-                | Left f <- cmdFn cmd = maybe (return $ Fail MissingOptionsError) ($ bck) $ runReaderT f dhClOptions
-                | Right f <- cmdFn cmd = do
-                    Right sid <- auth
-                    {-
-                    Just uid <- verifySession bck sid 0
-                    Just r <- (\f -> f uid bck) <$> runReaderT f dhClOptions
-                    destroySession bck sid
-                    -}
-                    return $ Ok
+                | Left f  <- cmdFn cmd = maybe (return $ responseFail MissingOptionsError) ($ bck) $ runReaderT f dhClOptions
+                | Right f <- cmdFn cmd = runEitherT $ do
+                    sid <- auth
+                    uid <- mbToET AuthError =<< liftIO (verifySession bck sid 0)
+                    r   <- liftIO (maybe (return $ responseFail MissingOptionsError) (\f -> f uid bck) $ runReaderT f dhClOptions)
+                    liftIO $ destroySession bck sid
+                    hoistEither r
 
               execCmd
                 | Just cmd <- lookup dhClCommand cmds
-                  -- = either return return $ exec cmd
-                  = undefined
+                  = exec cmd
                 | otherwise
-                  = return $ Fail NoSuchCommandError
+                  = return $ Left NoSuchCommandError
 
           execCmd
 

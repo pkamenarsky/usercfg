@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ExistentialQuantification, OverloadedStrings, TemplateHaskell #-}
+{-# LANGUAGE CPP, ExistentialQuantification, FlexibleInstances, OverloadedStrings, TemplateHaskell, TypeSynonymInstances #-}
 
 module Model where
 
@@ -7,6 +7,7 @@ import qualified Data.Aeson             as A
 import qualified Data.Map               as M
 import           Data.Proxy
 import qualified Data.Text              as T
+import qualified Data.Vector            as V
 
 import           Web.Users.Types
 
@@ -14,6 +15,14 @@ import           Model.Internal
 
 mkProxy :: a -> Proxy a
 mkProxy _ = Proxy
+
+object' :: [(T.Text, Value)] -> Value
+object' = object . filter (not . isDflt . snd)
+  where
+    isDflt Null       = True
+    isDflt (Bool b)   = not b
+    isDflt (Array a)  = V.null a
+    isDflt _          = False
 
 data Error = forall e. ToJSON e => UserStorageBackendError e
            | InvalidUserError
@@ -77,12 +86,20 @@ data DhCmdRequest = DhCmdRequest { dhClUser    :: T.Text
 deriveJSON' "dh" ''DhRequest
 deriveJSON' "dh" ''DhCmdRequest
 
-data Response = Ok | Response Value | Fail Error
+type Response = Either Error Value
+
+response :: Value -> Response
+response = Right
+
+responseOk :: Response
+responseOk = Right ""
+
+responseFail :: Error -> Response
+responseFail = Left
 
 instance ToJSON Response where
-  toJSON Ok           = A.object [ "status" .= ("ok" :: T.Text) ]
-  toJSON (Response v) = A.object [ "status" .= ("ok" :: T.Text)
-                                 , "response" .= v ]
-  toJSON (Fail e)     = A.object [ "status" .= ("error" :: T.Text)
-                                 , "error" .= toJSON e ]
+  toJSON (Right v) = object' [ "status" .= ("ok" :: T.Text)
+                             , "response" .= v ]
+  toJSON (Left e)  = object' [ "status" .= ("error" :: T.Text)
+                             , "error" .= toJSON e ]
 
