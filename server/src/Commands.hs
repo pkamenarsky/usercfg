@@ -9,6 +9,8 @@ import qualified Data.Map               as M
 import qualified Data.Text              as T
 import qualified Data.Text.Encoding     as TE
 
+-- import qualified Network.Sendgrid.Api   as SG
+
 import           Web.Users.Types
 
 import           Model
@@ -22,7 +24,7 @@ cmdCreateUser = cmd "create-user" False
     , optMay "number" "N" "User number" None Nothing
     , optMay "ssh-key" "S" "SSH public key" None Nothing
     ) $ \u_name u_email password usrNumber sshKey bck -> do
-        let sshKeyHash =  maybe "" (TE.decodeUtf8 . B16.encode . H.hash . TE.encodeUtf8) sshKey
+        let sshKeyHash = maybe "" (TE.decodeUtf8 . B16.encode . H.hash . TE.encodeUtf8) sshKey
 
         either (return . responseFail . UserStorageBackendError) (const $ return responseOk) =<<
           createUser bck (User

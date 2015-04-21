@@ -54,6 +54,7 @@ executable user-cfg
                        OneTuple,
                        path-pieces,
                        postgresql-simple,
+                       sendgrid-haskell,
                        servant,
                        servant-server,
                        stripe-haskell,
