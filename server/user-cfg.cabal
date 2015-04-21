@@ -64,6 +64,7 @@ executable user-cfg
                        tuple,
                        users >= 0.2.0.2,
                        users-postgresql-simple >= 0.2.0.2,
+                       users-test >= 0.2.0.2,
                        vector,
                        warp
   hs-source-dirs:      src
