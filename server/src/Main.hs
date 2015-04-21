@@ -135,25 +135,21 @@ runServer port bck cmds = do
 
           let (lru', shared) = LRU.delete dhClUser $ dhLRU st
 
-              sessionTime = 10000000
-
-              auth :: EitherT Error IO SessionId
-              auth
-                | Just clPass <- dhClPass
-                  = mbToET AuthPassError =<< liftIO (authUser bck dhClUser (PasswordPlain clPass) sessionTime)
-                | Just (keyHash, sig) <- dhClSig = do
+              auth cmd
+                | Just clPass <- dhClPass = do
+                    r <- withAuthUser bck dhClUser (PasswordPlain clPass) cmd
+                    maybe (return $ Left AuthError) return r
+                | Just (keyHash, sig) <- dhClSig = runEitherT $ do
                     f <- hoistEither $ authPubKey shared keyHash sig
-                    mbToET AuthKeyError =<< liftIO  (authUserByUserData bck dhClUser (f . usrSshKeys) sessionTime)
-                | otherwise = left AuthNeededError
+                    r <- liftIO $ withAuthUserByUserData bck dhClUser (f . usrSshKeys) cmd
+                    hoistEither $ maybe (Left AuthError) id r
+                | otherwise = return $ Left AuthNeededError
 
               exec cmd
-                | Left f  <- cmdFn cmd = maybe (return $ responseFail MissingOptionsError) ($ bck) $ runReaderT f dhClOptions
-                | Right f <- cmdFn cmd = runEitherT $ do
-                    sid <- auth
-                    uid <- mbToET AuthError =<< liftIO (verifySession bck sid 0)
-                    r   <- liftIO (maybe (return $ responseFail MissingOptionsError) (\rsv -> rsv uid bck) $ runReaderT f dhClOptions)
-                    liftIO $ destroySession bck sid
-                    hoistEither r
+                | Left f  <- cmdFn cmd =
+                    maybe (return $ responseFail MissingOptionsError) ($ bck) $ runReaderT f dhClOptions
+                | Right f <- cmdFn cmd =
+                    auth $ \uid -> maybe (return $ responseFail MissingOptionsError) (\rsv -> rsv uid bck) $ runReaderT f dhClOptions
                 | otherwise = return $ responseFail NoSuchCommandError
 
               execCmd
