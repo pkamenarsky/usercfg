@@ -52,6 +52,12 @@ instance ToJSON a => ToJSON (Option a) where
 emptyOption :: Option a
 emptyOption = Option { optName = "", optShort = "", optDesc = "", optPrompt = None, optDefault = Nothing, optResolve = undefined }
 
+userOption :: Option T.Text
+userOption = opt "name" "n" "User name" None
+
+passOption :: Option (Maybe T.Text)
+passOption = optMay "password" "p" "User password" None Nothing
+
 instance Applicative Option where
   pure  = return
   (<*>) = ap
@@ -91,6 +97,7 @@ optMay optName optShort optDesc optPrompt optDefault' = Option
 data Command bck r = forall opts. ToJSON opts => Command
   { cmdName     :: T.Text
   , cmdConfirm  :: Bool
+  , cmdNeedAuth :: Bool
   , cmdOpts     :: opts
   , cmdFn       :: Either (Resolve (bck -> r)) (Resolve (UserId bck -> bck -> r))
   }
@@ -98,10 +105,15 @@ data Command bck r = forall opts. ToJSON opts => Command
 instance ToJSON (Command bck r) where
   toJSON (Command {..}) = object'
     [ "name"    .= cmdName
-    , "options" .= cmdOpts
+    , "options" .= (amendOpts $ toJSON cmdOpts)
     , "confirm" .= cmdConfirm
     , "auth"    .= isLeft cmdFn
     ]
+    where
+      amendOpts os@(Array a)
+        | cmdNeedAuth = Array (toJSON userOption `V.cons` (toJSON passOption `V.cons` a))
+        | otherwise   = os
+      amendOpts os    = os
 
 instance FromJSON a => FromJSON (OneTuple a) where
   parseJSON (Array a) = OneTuple <$> (parseJSON $ V.head a)
@@ -118,7 +130,7 @@ apply :: (Monad m, SequenceT a (m b), Curry (b -> c) d)  => a -> d -> m c
 apply opts f = sequenceT opts >>= return . uncurryN f
 
 cmd :: (ToJSON opts, SequenceT opts (Option b), Curry (b -> bck -> r) f) => T.Text -> Bool -> opts -> f -> (T.Text, Command bck r)
-cmd cmdName cmdConfirm cmdOpts f = (cmdName, Command { cmdFn = Left $ optResolve $ apply cmdOpts f, .. })
+cmd cmdName cmdConfirm cmdOpts f = (cmdName, Command { cmdNeedAuth = False, cmdFn = Left $ optResolve $ apply cmdOpts f, .. })
 
 cmdAuth :: (ToJSON opts, SequenceT opts (Option b), Curry (b -> UserId bck -> bck -> r) f) => T.Text -> Bool -> opts -> f -> (T.Text, Command bck r)
-cmdAuth cmdName cmdConfirm cmdOpts f = (cmdName, Command { cmdFn = Right $ optResolve $ apply cmdOpts f, .. })
+cmdAuth cmdName cmdConfirm cmdOpts f = (cmdName, Command { cmdNeedAuth = True, cmdFn = Right $ optResolve $ apply cmdOpts f, .. })

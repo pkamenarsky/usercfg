@@ -27,11 +27,9 @@ import           Command
 
 cmdPing :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
 cmdPing = cmdAuth "ping" True
-    ( opt "name" "n" "User name" None
-    , opt "ping" "i" "Ping" None
+    ( opt "ping" "i" "Ping" None
     , opt "pong" "o" "Pong" None
-    ) $ \name ping pong uid _bck -> do
-        print $ T.unpack name
+    ) $ \ping pong uid _bck -> do
         print $ T.unpack ping
         print $ T.unpack pong
         print uid
@@ -40,7 +38,7 @@ cmdPing = cmdAuth "ping" True
 
 cmdResetPassword :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
 cmdResetPassword = cmd "reset-password" True
-    (OneTuple $ opt "name" "n" "User name" None) $ \username bck -> do
+    (OneTuple userOption) $ \username bck -> do
       runMaybeT $ do
         userId <- MaybeT $ getUserIdByName bck username
         user   <- MaybeT $ getUserById bck userId :: MaybeT IO (User UserData)
@@ -65,9 +63,9 @@ cmdResetPassword = cmd "reset-password" True
 
 cmdCreateUser :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
 cmdCreateUser = cmd "create-user" False
-    ( opt    "name" "n" "User name" None
+    ( userOption
     , opt    "email" "e" "User mail" None
-    , opt    "password" "p" "User password" None
+    , opt    "password" "p" "User password" None -- make optional, generate random password
     , optMay "number" "N" "User number" None Nothing
     , optMay "ssh-key" "S" "SSH public key" None Nothing
     ) $ \u_name u_email password usrNumber sshKey bck -> do

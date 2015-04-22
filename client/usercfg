@@ -18,7 +18,7 @@ options = [['ping', '666'], ['name', 'phil'], ['pong', '777']]
 
 optionsHash = ''.join(sorted([k + v for k, v in options]))
 
-cmdHash =  user + cmd + optionsHash
+cmdHash =  cmd + optionsHash
 
 print cmdHash
 

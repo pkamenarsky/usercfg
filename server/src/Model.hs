@@ -93,17 +93,14 @@ data UserData = UserData
 deriveJSON' "usr" ''UserData
 
 data DhRequest    = DhRequest    { dhReqUser   :: T.Text }
-data DhCmdRequest = DhCmdRequest { dhClUser    :: Maybe T.Text
-                                 , dhClCommand :: T.Text
+data DhCmdRequest = DhCmdRequest { dhClCommand :: T.Text
                                  , dhClOptions :: Keys
-                                 , dhClPass    :: Maybe T.Text
                                  , dhClSig     :: Maybe (T.Text, T.Text)
                                  } deriving Show
 
 hashCmdRequest :: DhCmdRequest -> B.ByteString
 hashCmdRequest DhCmdRequest {..} =
-  TE.encodeUtf8 $ (fromMaybe "" dhClUser)
-               <> dhClCommand
+  TE.encodeUtf8 $ dhClCommand
                <> (T.concat $ sort $ map (uncurry T.append) dhClOptions)
 
 deriveJSON' "dh" ''DhRequest

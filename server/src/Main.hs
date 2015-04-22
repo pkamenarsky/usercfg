@@ -40,7 +40,7 @@ import           Network.Wai.Handler.Warp
 
 import           System.Environment
 
-import           Command                  (Command (..))
+import           Command                  (Command (..), Option (..), userOption, passOption)
 import           Commands
 import           Model
 
@@ -132,20 +132,22 @@ runServer port bck cmds = do
         command req@(DhCmdRequest {..}) = liftIO $ do
           st <- readIORef stref
 
-          let (lru', shared) = maybe (dhLRU st, Nothing) (flip LRU.delete (dhLRU st)) dhClUser
+          let userMay = lookup (optName userOption) dhClOptions
+              passMay = lookup (optName passOption) dhClOptions
+              (lru', shared) = maybe (dhLRU st, Nothing) (flip LRU.delete (dhLRU st)) userMay
 
               mbToR r = maybe (return $ responseFail r)
 
               auth cmd
-                | Just clPass    <- dhClPass
-                , Just dhClUser' <- dhClUser = do
-                    r <- withAuthUser bck dhClUser' (PasswordPlain clPass) cmd
+                | Just pass <- passMay
+                , Just user <- userMay = do
+                    r <- withAuthUser bck user (PasswordPlain pass) cmd
                     mbToR AuthError return r
                 | Just (keyHash, sig) <- dhClSig
-                , Just dhClUser'      <- dhClUser = runEitherT $ do
+                , Just user           <- userMay = runEitherT $ do
                     f <- hoistEither $ authPubKey req shared keyHash sig
                     r <- liftIO
-                       $ withAuthUserByUserData bck dhClUser' (f . usrSshKeys) cmd
+                       $ withAuthUserByUserData bck user (f . usrSshKeys) cmd
                     hoistEither $ maybe (Left AuthError) id r
                 | otherwise = return $ responseFail AuthNeededError
 
