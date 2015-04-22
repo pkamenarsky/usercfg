@@ -3,7 +3,6 @@
 import argparse
 import urllib2
 import json
-import DiffieHellman
 import commands
 import subprocess
 import paramiko.agent
@@ -13,50 +12,96 @@ import os.path
 
 home = os.path.expanduser("~")
 
-dh = DiffieHellman.DiffieHellman()
+def getCmdFromArgs(args):
+  return { 'cl-command': args.__command
+         , 'cl-options': [[k.replace('_', '-'), v] for k, v in vars(args).items() if k != '__command' and v is not None]
+         }
 
-response = urllib2.urlopen('http://localhost:8000/dh', json.dumps({ 'cl-pub': dh.publicKey, 'req-user': 'phil' }))
-svPublicKey = json.load(response)['response']
+def getCmdString(cmd):
+  return cmd['cl-command'] + ''.join(sorted([k + str(v) for k, v in cmd['cl-options']]))
 
-shared = dh.genSecret(dh.privateKey, svPublicKey)
+def listHasOption(options, option):
+  for v in options:
+    if v['name'] == option:
+      return True
 
-agent = paramiko.Agent()
-keys = agent.get_keys()
+  return False
 
-if len(keys) < 1:
-  subprocess.call('ssh-add')
+def cmdHasOption(cmd, option):
+  for k, v in cmd['cl-options']:
+    if k == option:
+      return True
+
+  return False
+
+def cmdSetOption(cmd, option, value):
+ cmd['cl-options'] = [[k, value] if k == option else [k, v] for k, v in cmd['cl-options']]
+
+def getSignedCmd(cmd):
+  cmdString = getCmdString(cmd)
+  cmdHash = hashlib.sha1(cmdString).hexdigest()
+  response = urllib2.urlopen('http://localhost:8000/dh', json.dumps({ 'req-hash': cmdHash }))
+
+  svRandBlob = json.load(response)['response']
+  svRand = base64.b64decode(svRandBlob)
+
   agent = paramiko.Agent()
   keys = agent.get_keys()
 
-pubkeySha1 = ''
+  if len(keys) < 1:
+    subprocess.call('ssh-add')
+    agent = paramiko.Agent()
+    keys = agent.get_keys()
 
-with open(home + '/.ssh/id_rsa.pub', 'r') as content_file:
-  pubkey = content_file.read()
-  pubkeySha1 = hashlib.sha1(pubkey).hexdigest()
+  pubkeySha1 = ''
 
-  print(pubkeySha1)
+  with open(home + '/.ssh/id_rsa.pub', 'r') as content_file:
+    pubkey = content_file.read()
+    pubkeySha1 = hashlib.sha1(pubkey).hexdigest()
 
-sig = base64.b64encode(keys[0].sign_ssh_data(str(shared)))
+  sig = base64.b64encode(keys[0].sign_ssh_data(svRand + cmdString))
 
-# response = urllib2.urlopen('http://localhost:8000/cmd', json.dumps({ 'cl-command' : 'ping', 'cl-options': [['a', 'b']], 'cl-sig' : [pubkeySha1, sig], 'cl-user': 'phil' }))
-response = urllib2.urlopen('http://localhost:8000/cmd', json.dumps({ 'cl-command' : 'ping2', 'cl-options': [['a', 'b']], 'cl-user': 'phil' }))
-svSignResponse = json.load(response)
+  sigCmd = dict(cmd)
+  sigCmd['cl-sig'] = [pubkeySha1, sig]
+  return sigCmd
 
-print(svSignResponse)
-
-'''
-parser = argparse.ArgumentParser(description='User configuration utility')
-
+# Get supported commands
 response = urllib2.urlopen('http://localhost:8000/info')
 data = json.load(response)
 
-subparsers = parser.add_subparsers(title='commands', help='-h gives command help')
+commands = data['response']
 
-for command in data['response']:
+# Parser configuration
+parser = argparse.ArgumentParser(description='User configuration utility')
+
+subparsers = parser.add_subparsers(title='commands', dest='__command', help='-h gives command help')
+
+for _, command in commands:
   subparser = subparsers.add_parser(command['name'], help='Help for command')
 
-  for option in command['options']:
-    subparser.add_argument('--' + option['name'], help=option['description'])
+  if 'options' in command:
+    for option in command['options']:
+      if (option['name'] == 'ssh-key'):
+        subparser.add_argument('--' + option['name'], help=option['description'], action='store_true')
+      else:
+        subparser.add_argument('--' + option['name'], help=option['description'])
 
-args = parser.parse_args()
-'''
+try:
+  args = parser.parse_args()
+
+  cmd = getCmdFromArgs(args)
+  cmdInfo = dict(commands)[args.__command]
+  cmdOptions = cmdInfo['options']
+
+  if listHasOption(cmdOptions, 'password') and not cmdHasOption(cmd, 'password'):
+    cmd = getSignedCmd(cmd)
+
+  if listHasOption(cmdOptions, 'ssh-key') and cmdHasOption(cmd, 'ssh-key'):
+    with open(home + '/.ssh/id_rsa.pub', 'r') as content_file:
+      cmdSetOption(cmd, 'ssh-key', content_file.read())
+
+  response = urllib2.urlopen('http://localhost:8000/command', json.dumps(cmd))
+
+  print json.load(response)
+except argparse.ArgumentError, exc:
+    print exc.message, '\n', exc.argument

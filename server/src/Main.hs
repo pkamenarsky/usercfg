@@ -7,6 +7,7 @@ import           Control.Monad
 import           Control.Monad.Trans.Either
 import           Control.Monad.Reader
 
+import qualified Crypto.Hash.SHA1         as H
 import           Crypto.PubKey.OpenSsh
 import           Crypto.PubKey.HashDescr
 import           Crypto.PubKey.RSA.PKCS15
@@ -14,12 +15,13 @@ import           Crypto.Random
 
 import           Data.Aeson
 import qualified Data.ByteString          as B
+import qualified Data.ByteString.Base16   as B16
 import qualified Data.ByteString.Base64   as B64
 import qualified Data.ByteString.Char8    as BC
 import qualified Data.Cache.LRU           as LRU
 import           Data.Either.Combinators
 import           Data.IORef
-import qualified Data.Map               as M
+import qualified Data.Map                 as M
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Proxy
@@ -40,9 +42,16 @@ import           Network.Wai.Handler.Warp
 
 import           System.Environment
 
-import           Command                  (Command (..))
+import           Command                  (Command (..), Option (..), userOption, passOption)
 import           Commands
 import           Model
+
+#ifdef DEBUG
+import           Debug.Trace
+
+trc :: Show a => String -> a -> a
+trc str x = trace (str ++ ": " ++ show x) x
+#endif
 
 type Api = "info" :> Get Response
       :<|> "dh" :> ReqBody DhRequest :> Post Response
@@ -86,7 +95,7 @@ authPubKey req shared sshHash sigBlob = do
           pubkey' = join $ unpackPubKey . decodePublic . TE.encodeUtf8 <$> pubkey
       in fromMaybe False $ verify hashDescrSHA1
                        <$> pubkey'
-                       <*> pure ((BC.pack $ show shared') <> hashCmdRequest req)
+                       <*> pure (shared' <> hashCmdRequest req)
                        <*> pure sig
     where
       unpackShared (Just x) = Right x
@@ -116,30 +125,36 @@ runServer port bck cmds = do
         dh DhRequest {..} = liftIO $ do
            st <- readIORef stref
 
-           let (shared, cprg) = cprgGenerate 64 (dhCPRG st)
+           let (shared, cprg) = cprgGenerate 256 (dhCPRG st)
 
            modifyIORef stref $ \st' -> st'
-             { dhLRU  = LRU.insert dhReqUser shared $ dhLRU st'
+             -- SHA-1 produces a 40 digit hex string; reject longer inputs
+             { dhLRU  = LRU.insert (T.take 40 dhReqHash) shared $ dhLRU st'
              , dhCPRG = cprg
              }
 
-           return $ response $ toJSON $ B.unpack $ B64.encode shared
+           return $ response $ toJSON $ BC.unpack $ B64.encode shared
 
         command req@(DhCmdRequest {..}) = liftIO $ do
           st <- readIORef stref
 
-          let (lru', shared) = LRU.delete dhClUser $ dhLRU st
+          let userMay = lookup (optName userOption) dhClOptions
+              passMay = lookup (optName passOption) dhClOptions
+              cmdHash = TE.decodeUtf8 $ B16.encode $ H.hash $ hashCmdRequest req
+              (lru', shared) = LRU.delete cmdHash $ dhLRU st
 
               mbToR r = maybe (return $ responseFail r)
 
               auth cmd
-                | Just clPass <- dhClPass = do
-                    r <- withAuthUser bck dhClUser (PasswordPlain clPass) cmd
+                | Just pass <- passMay
+                , Just user <- userMay = do
+                    r <- withAuthUser bck user (PasswordPlain pass) cmd
                     mbToR AuthError return r
-                | Just (keyHash, sig) <- dhClSig = runEitherT $ do
+                | Just (keyHash, sig) <- dhClSig
+                , Just user           <- userMay = runEitherT $ do
                     f <- hoistEither $ authPubKey req shared keyHash sig
                     r <- liftIO
-                       $ withAuthUserByUserData bck dhClUser (f . usrSshKeys) cmd
+                       $ withAuthUserByUserData bck user (f . usrSshKeys) cmd
                     hoistEither $ maybe (Left AuthError) id r
                 | otherwise = return $ responseFail AuthNeededError
 

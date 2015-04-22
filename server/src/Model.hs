@@ -26,6 +26,7 @@ object' = object . filter (not . isDflt . snd)
     isDflt Null       = True
     isDflt (Bool b)   = not b
     isDflt (Array a)  = V.null a
+    isDflt (String a) = T.null a
     isDflt _          = False
 
 type Keys = [(T.Text, T.Text)]
@@ -90,18 +91,15 @@ data UserData = UserData
 
 deriveJSON' "usr" ''UserData
 
-data DhRequest    = DhRequest    { dhReqUser   :: T.Text, dhClPub :: Integer } deriving Show
-data DhCmdRequest = DhCmdRequest { dhClUser    :: T.Text
-                                 , dhClCommand :: T.Text
+data DhRequest    = DhRequest    { dhReqHash   :: T.Text }
+data DhCmdRequest = DhCmdRequest { dhClCommand :: T.Text
                                  , dhClOptions :: Keys
-                                 , dhClPass    :: Maybe T.Text
                                  , dhClSig     :: Maybe (T.Text, T.Text)
                                  } deriving Show
 
 hashCmdRequest :: DhCmdRequest -> B.ByteString
 hashCmdRequest DhCmdRequest {..} =
-  TE.encodeUtf8 $ dhClUser
-               <> dhClCommand
+  TE.encodeUtf8 $ dhClCommand
                <> (T.concat $ sort $ map (uncurry T.append) dhClOptions)
 
 deriveJSON' "dh" ''DhRequest
