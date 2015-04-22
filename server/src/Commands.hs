@@ -4,6 +4,7 @@ module Commands where
 
 import           Control.Applicative
 import           Control.Monad.Trans.Maybe
+import           Control.Monad.IO.Class
 
 import qualified Crypto.Hash.SHA1           as H
 
@@ -27,7 +28,7 @@ import           Command
 cmdResetPassword :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
 cmdResetPassword = cmd "reset-password" True
     (OneTuple $ opt "name" "n" "User name" None) $ \username bck -> do
-      r <- runMaybeT $ do
+      runMaybeT $ do
         userId <- MaybeT $ getUserIdByName bck username
         user   <- MaybeT $ getUserById bck userId :: MaybeT IO (User UserData)
         token  <- MaybeT $ Just <$> requestPasswordReset bck userId 1000000
@@ -38,21 +39,16 @@ cmdResetPassword = cmd "reset-password" True
         sgSubj <- MaybeT $ lookupEnv "SG_SUBJ"
         sgText <- MaybeT $ lookupEnv "SG_TEXT"
 
-        return (user, token, sgUser, sgPass, sgFrom, sgSubj, sgText)
+        liftIO $ SG.sendEmail (SG.Authentication sgUser sgPass)
+          $ SG.EmailMessage
+            { to      = T.unpack $ u_email user
+            , from    = sgFrom
+            , subject = sgSubj
+            , text    = intercalate ( T.unpack $ unPasswordResetToken token )
+                                    $ splitOn "$TOKEN" sgText
+            }
 
-      case r of
-        Just (user, token, sgUser, sgPass, sgFrom, sgSubj, sgText) -> do
-          SG.sendEmail ( SG.Authentication sgUser sgPass )
-                       $ SG.EmailMessage
-                         { to      = T.unpack $ u_email user
-                         , from    = sgFrom
-                         , subject = sgSubj
-                         , text    = intercalate
-                                      ( T.unpack $ unPasswordResetToken token )
-                                      $ splitOn "$TOKEN" sgText
-                         }
-          return responseOk
-        Nothing -> return responseOk
+      return responseOk
 
 cmdCreateUser :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
 cmdCreateUser = cmd "create-user" False
