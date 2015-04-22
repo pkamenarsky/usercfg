@@ -14,6 +14,8 @@ import           Data.Tuple.Curry
 import           Data.Tuple.OneTuple
 import           Data.Tuple.Sequence
 
+import qualified Data.Vector              as V
+
 import           Web.Users.Types
 
 import           Model
@@ -58,16 +60,30 @@ instance Monad Option where
   return x = emptyOption { optResolve = return x }
   v >>= f  = emptyOption { optResolve = optResolve v >>= (optResolve <$> f) }
 
-opt :: Read a => T.Text -> T.Text -> T.Text -> Prompt -> Option a
+class Readable a where
+  read' :: T.Text -> Maybe a
+
+instance Readable () where
+  read' "" = Just ()
+  read' _  = Nothing
+
+instance Readable T.Text where
+  read' = Just
+
+instance Readable a => Readable (Maybe a) where
+  read' ""  = Nothing
+  read' str = Just $ read' str
+
+opt :: Readable a => T.Text -> T.Text -> T.Text -> Prompt -> Option a
 opt optName optShort optDesc optPrompt = Option
-  { optResolve = ReaderT $ \keys -> read . T.unpack <$> lookup optName keys
+  { optResolve = ReaderT $ \keys -> join $ read' <$> lookup optName keys
   , optDefault = Nothing
   , ..
   }
 
-optMay :: Read a => T.Text -> T.Text -> T.Text -> Prompt -> Maybe a -> Option (Maybe a)
+optMay :: Readable a => T.Text -> T.Text -> T.Text -> Prompt -> Maybe a -> Option (Maybe a)
 optMay optName optShort optDesc optPrompt optDefault' = Option
-  { optResolve = ReaderT $ \keys -> (read . T.unpack <$> lookup optName keys) <|> Just optDefault'
+  { optResolve = ReaderT $ \keys -> (join $ read' <$> lookup optName keys) <|> Just optDefault'
   , optDefault = Just optDefault'
   , ..
   }
@@ -88,10 +104,12 @@ instance ToJSON (Command bck r) where
     ]
 
 instance FromJSON a => FromJSON (OneTuple a) where
-  parseJSON a = OneTuple <$> parseJSON a
+  parseJSON (Array a) = OneTuple <$> (parseJSON $ V.head a)
+  parseJSON _         = fail "Expected array when parsing tuple"
 
-instance ToJSON a => ToJSON (OneTuple a) where
-  toJSON (OneTuple a) = toJSON a
+instance ToJSON (Option a) => ToJSON (OneTuple (Option a)) where
+  toJSON (OneTuple opt@(Option {..})) | T.null optName = toJSON ([] :: [Int])
+                                      | otherwise      = toJSON [opt]
 
 noArgs :: Data.Tuple.OneTuple.OneTuple (Option (Maybe ()))
 noArgs = OneTuple $ optMay "" "" "" None Nothing

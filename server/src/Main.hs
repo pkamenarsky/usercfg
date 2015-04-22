@@ -44,6 +44,8 @@ import           Command                  (Command (..))
 import           Commands
 import           Model
 
+import Debug.Trace
+
 type Api = "info" :> Get Response
       :<|> "dh" :> ReqBody DhRequest :> Post Response
       :<|> "command" :> ReqBody DhCmdRequest :> Post Response
@@ -69,6 +71,8 @@ mbToET :: Monad m => e -> Maybe a -> EitherT e m a
 mbToET _ (Just x) = right x
 mbToET e Nothing  = left e
 
+trc str x = trace (str ++ ": " ++ show x) x
+
 authPubKey :: DhCmdRequest -> Maybe B.ByteString -> T.Text -> T.Text -> Either Error (M.Map T.Text T.Text -> Bool)
 authPubKey req shared sshHash sigBlob = do
   shared'  <- unpackShared shared
@@ -86,7 +90,7 @@ authPubKey req shared sshHash sigBlob = do
           pubkey' = join $ unpackPubKey . decodePublic . TE.encodeUtf8 <$> pubkey
       in fromMaybe False $ verify hashDescrSHA1
                        <$> pubkey'
-                       <*> pure ((BC.pack $ show shared') <> hashCmdRequest req)
+                       <*> pure (trc "hash" (shared' <> hashCmdRequest req))
                        <*> pure sig
     where
       unpackShared (Just x) = Right x
@@ -116,30 +120,32 @@ runServer port bck cmds = do
         dh DhRequest {..} = liftIO $ do
            st <- readIORef stref
 
-           let (shared, cprg) = cprgGenerate 64 (dhCPRG st)
+           let (shared, cprg) = cprgGenerate 256 (dhCPRG st)
 
            modifyIORef stref $ \st' -> st'
              { dhLRU  = LRU.insert dhReqUser shared $ dhLRU st'
              , dhCPRG = cprg
              }
 
-           return $ response $ toJSON $ B.unpack $ B64.encode shared
+           return $ response $ toJSON $ BC.unpack $ B64.encode shared
 
         command req@(DhCmdRequest {..}) = liftIO $ do
           st <- readIORef stref
 
-          let (lru', shared) = LRU.delete dhClUser $ dhLRU st
+          let (lru', shared) = maybe (dhLRU st, Nothing) (flip LRU.delete (dhLRU st)) dhClUser
 
               mbToR r = maybe (return $ responseFail r)
 
               auth cmd
-                | Just clPass <- dhClPass = do
-                    r <- withAuthUser bck dhClUser (PasswordPlain clPass) cmd
+                | Just clPass    <- dhClPass
+                , Just dhClUser' <- dhClUser = do
+                    r <- withAuthUser bck dhClUser' (PasswordPlain clPass) cmd
                     mbToR AuthError return r
-                | Just (keyHash, sig) <- dhClSig = runEitherT $ do
+                | Just (keyHash, sig) <- dhClSig
+                , Just dhClUser'      <- dhClUser = runEitherT $ do
                     f <- hoistEither $ authPubKey req shared keyHash sig
                     r <- liftIO
-                       $ withAuthUserByUserData bck dhClUser (f . usrSshKeys) cmd
+                       $ withAuthUserByUserData bck dhClUser' (f . usrSshKeys) cmd
                     hoistEither $ maybe (Left AuthError) id r
                 | otherwise = return $ responseFail AuthNeededError
 

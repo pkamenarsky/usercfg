@@ -3,7 +3,6 @@
 import argparse
 import urllib2
 import json
-import DiffieHellman
 import commands
 import subprocess
 import paramiko.agent
@@ -13,12 +12,22 @@ import os.path
 
 home = os.path.expanduser("~")
 
-dh = DiffieHellman.DiffieHellman()
+user = 'phil'
+cmd = 'ping'
+options = [['ping', '666'], ['name', 'phil'], ['pong', '777']]
 
-response = urllib2.urlopen('http://localhost:8000/dh', json.dumps({ 'cl-pub': dh.publicKey, 'req-user': 'phil' }))
-svPublicKey = json.load(response)['response']
+optionsHash = ''.join(sorted([k + v for k, v in options]))
 
-shared = dh.genSecret(dh.privateKey, svPublicKey)
+cmdHash =  user + cmd + optionsHash
+
+print cmdHash
+
+response = urllib2.urlopen('http://localhost:8000/dh', json.dumps({ 'req-user': 'phil' }))
+
+svRandBlob = json.load(response)['response']
+svRand = base64.b64decode(svRandBlob)
+
+print svRand
 
 agent = paramiko.Agent()
 keys = agent.get_keys()
@@ -36,15 +45,30 @@ with open(home + '/.ssh/id_rsa.pub', 'r') as content_file:
 
   print(pubkeySha1)
 
-sig = base64.b64encode(keys[0].sign_ssh_data(str(shared)))
+sig = base64.b64encode(keys[0].sign_ssh_data(svRand + cmdHash))
 
-# response = urllib2.urlopen('http://localhost:8000/cmd', json.dumps({ 'cl-command' : 'ping', 'cl-options': [['a', 'b']], 'cl-sig' : [pubkeySha1, sig], 'cl-user': 'phil' }))
-response = urllib2.urlopen('http://localhost:8000/cmd', json.dumps({ 'cl-command' : 'ping2', 'cl-options': [['a', 'b']], 'cl-user': 'phil' }))
-svSignResponse = json.load(response)
+print sig
 
-print(svSignResponse)
+response = urllib2.urlopen('http://localhost:8000/command', json.dumps(
+  { 'cl-command' : 'create-user'
+  , 'cl-options': [ ['name', 'adi']
+                  , ['email', 'none']
+                  , ['password', 'none']
+                  , ['ssh-key', pubkey]
+                  ]
+  }))
 
-'''
+print(json.load(response))
+
+response = urllib2.urlopen('http://localhost:8000/command', json.dumps(
+  { 'cl-command' : cmd
+  , 'cl-user'    : user
+  , 'cl-options' : options
+  , 'cl-sig'     : [pubkeySha1, sig]
+  }))
+
+print(json.load(response))
+
 parser = argparse.ArgumentParser(description='User configuration utility')
 
 response = urllib2.urlopen('http://localhost:8000/info')
@@ -52,11 +76,11 @@ data = json.load(response)
 
 subparsers = parser.add_subparsers(title='commands', help='-h gives command help')
 
-for command in data['response']:
+for _, command in data['response']:
   subparser = subparsers.add_parser(command['name'], help='Help for command')
 
-  for option in command['options']:
-    subparser.add_argument('--' + option['name'], help=option['description'])
+  if 'options' in command:
+    for option in command['options']:
+      subparser.add_argument('--' + option['name'], help=option['description'])
 
 args = parser.parse_args()
-'''

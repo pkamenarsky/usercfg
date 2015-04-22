@@ -25,6 +25,19 @@ import           Web.Users.Types
 import           Model
 import           Command
 
+cmdPing :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
+cmdPing = cmdAuth "ping" True
+    ( opt "name" "n" "User name" None
+    , opt "ping" "i" "Ping" None
+    , opt "pong" "o" "Pong" None
+    ) $ \name ping pong uid _bck -> do
+        print $ T.unpack name
+        print $ T.unpack ping
+        print $ T.unpack pong
+        print uid
+
+        return responseOk
+
 cmdResetPassword :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
 cmdResetPassword = cmd "reset-password" True
     (OneTuple $ opt "name" "n" "User name" None) $ \username bck -> do
@@ -77,4 +90,5 @@ commands =
   [ cmdCreateUser
   , cmdResetPassword
   , cmdAuth "delete-user" True noArgs $ \_ uid bck -> deleteUser bck uid >> return responseOk
+  , cmdPing
   ]

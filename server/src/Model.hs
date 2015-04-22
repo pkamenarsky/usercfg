@@ -6,6 +6,7 @@ import           Data.Aeson
 import qualified Data.Aeson             as A
 import qualified Data.ByteString        as B
 import           Data.List
+import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Map               as M
 import           Data.Proxy
@@ -26,6 +27,7 @@ object' = object . filter (not . isDflt . snd)
     isDflt Null       = True
     isDflt (Bool b)   = not b
     isDflt (Array a)  = V.null a
+    isDflt (String a) = T.null a
     isDflt _          = False
 
 type Keys = [(T.Text, T.Text)]
@@ -90,8 +92,8 @@ data UserData = UserData
 
 deriveJSON' "usr" ''UserData
 
-data DhRequest    = DhRequest    { dhReqUser   :: T.Text, dhClPub :: Integer } deriving Show
-data DhCmdRequest = DhCmdRequest { dhClUser    :: T.Text
+data DhRequest    = DhRequest    { dhReqUser   :: T.Text }
+data DhCmdRequest = DhCmdRequest { dhClUser    :: Maybe T.Text
                                  , dhClCommand :: T.Text
                                  , dhClOptions :: Keys
                                  , dhClPass    :: Maybe T.Text
@@ -100,7 +102,7 @@ data DhCmdRequest = DhCmdRequest { dhClUser    :: T.Text
 
 hashCmdRequest :: DhCmdRequest -> B.ByteString
 hashCmdRequest DhCmdRequest {..} =
-  TE.encodeUtf8 $ dhClUser
+  TE.encodeUtf8 $ (fromMaybe "" dhClUser)
                <> dhClCommand
                <> (T.concat $ sort $ map (uncurry T.append) dhClOptions)
 
