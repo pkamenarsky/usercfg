@@ -21,6 +21,7 @@ import           Data.Either.Combinators
 import           Data.IORef
 import qualified Data.Map               as M
 import           Data.Maybe
+import           Data.Monoid
 import           Data.Proxy
 import           Data.Serialize.Get       (getWord32be, getWord8, runGet)
 import qualified Data.Text.Encoding       as TE
@@ -85,7 +86,7 @@ authPubKey req shared sshHash sigBlob = do
           pubkey' = join $ unpackPubKey . decodePublic . TE.encodeUtf8 <$> pubkey
       in fromMaybe False $ verify hashDescrSHA1
                        <$> pubkey'
-                       <*> pure ((BC.pack $ show shared') `B.append` hashCmdRequest req)
+                       <*> pure ((BC.pack $ show shared') <> hashCmdRequest req)
                        <*> pure sig
     where
       unpackShared (Just x) = Right x
