@@ -57,6 +57,7 @@ executable user-cfg
                        sendgrid-haskell,
                        servant,
                        servant-server,
+                       split,
                        stripe-haskell,
                        template-haskell,
                        text,
