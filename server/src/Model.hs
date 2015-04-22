@@ -1,12 +1,16 @@
-{-# LANGUAGE CPP, ExistentialQuantification, FlexibleInstances, OverloadedStrings, TemplateHaskell, TypeSynonymInstances #-}
+{-# LANGUAGE CPP, ExistentialQuantification, FlexibleInstances, OverloadedStrings, RecordWildCards, TemplateHaskell, TypeSynonymInstances #-}
 
 module Model where
 
 import           Data.Aeson
 import qualified Data.Aeson             as A
+import qualified Data.ByteString        as B
+import           Data.List
+import           Data.Monoid
 import qualified Data.Map               as M
 import           Data.Proxy
 import qualified Data.Text              as T
+import qualified Data.Text.Encoding     as TE
 import qualified Data.Vector            as V
 
 import           Web.Users.Types
@@ -93,6 +97,12 @@ data DhCmdRequest = DhCmdRequest { dhClUser    :: T.Text
                                  , dhClPass    :: Maybe T.Text
                                  , dhClSig     :: Maybe (T.Text, T.Text)
                                  } deriving Show
+
+hashCmdRequest :: DhCmdRequest -> B.ByteString
+hashCmdRequest DhCmdRequest {..} =
+  TE.encodeUtf8 $ dhClUser
+               <> dhClCommand
+               <> (T.concat $ sort $ map (uncurry T.append) dhClOptions)
 
 deriveJSON' "dh" ''DhRequest
 deriveJSON' "dh" ''DhCmdRequest
