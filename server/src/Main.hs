@@ -19,9 +19,9 @@ import qualified Data.ByteString.Char8    as BC
 import qualified Data.Cache.LRU           as LRU
 import           Data.Either.Combinators
 import           Data.IORef
-import           Data.List
 import qualified Data.Map               as M
 import           Data.Maybe
+import           Data.Monoid
 import           Data.Proxy
 import           Data.Serialize.Get       (getWord32be, getWord8, runGet)
 import qualified Data.Text.Encoding       as TE
@@ -69,8 +69,8 @@ mbToET :: Monad m => e -> Maybe a -> EitherT e m a
 mbToET _ (Just x) = right x
 mbToET e Nothing  = left e
 
-authPubKey :: Keys -> Maybe B.ByteString -> T.Text -> T.Text -> Either Error (M.Map T.Text T.Text -> Bool)
-authPubKey keys shared sshHash sigBlob = do
+authPubKey :: DhCmdRequest -> Maybe B.ByteString -> T.Text -> T.Text -> Either Error (M.Map T.Text T.Text -> Bool)
+authPubKey req shared sshHash sigBlob = do
   shared'  <- unpackShared shared
   blob     <- mapLeft (const $ ParseError "b64") $ B64.decode $ TE.encodeUtf8 sigBlob
 
@@ -86,7 +86,7 @@ authPubKey keys shared sshHash sigBlob = do
           pubkey' = join $ unpackPubKey . decodePublic . TE.encodeUtf8 <$> pubkey
       in fromMaybe False $ verify hashDescrSHA1
                        <$> pubkey'
-                       <*> pure ((BC.pack $ show shared') `B.append` keysHash keys)
+                       <*> pure ((BC.pack $ show shared') <> hashCmdRequest req)
                        <*> pure sig
     where
       unpackShared (Just x) = Right x
@@ -94,9 +94,6 @@ authPubKey keys shared sshHash sigBlob = do
 
       unpackPubKey (Right (OpenSshPublicKeyRsa x _)) = Just x
       unpackPubKey _                                 = Nothing
-
-keysHash :: Keys -> B.ByteString
-keysHash = TE.encodeUtf8 . T.concat . sort . map (uncurry T.append)
 
 runServer :: UserStorageBackend bck => Int -> bck -> [(T.Text, Command bck (IO Response))] -> IO ()
 runServer port bck cmds = do
@@ -128,7 +125,7 @@ runServer port bck cmds = do
 
            return $ response $ toJSON $ B.unpack $ B64.encode shared
 
-        command DhCmdRequest {..} = liftIO $ do
+        command req@(DhCmdRequest {..}) = liftIO $ do
           st <- readIORef stref
 
           let (lru', shared) = LRU.delete dhClUser $ dhLRU st
@@ -140,7 +137,7 @@ runServer port bck cmds = do
                     r <- withAuthUser bck dhClUser (PasswordPlain clPass) cmd
                     mbToR AuthError return r
                 | Just (keyHash, sig) <- dhClSig = runEitherT $ do
-                    f <- hoistEither $ authPubKey dhClOptions shared keyHash sig
+                    f <- hoistEither $ authPubKey req shared keyHash sig
                     r <- liftIO
                        $ withAuthUserByUserData bck dhClUser (f . usrSshKeys) cmd
                     hoistEither $ maybe (Left AuthError) id r
