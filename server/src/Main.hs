@@ -128,6 +128,7 @@ runServer port bck cmds = do
            let (shared, cprg) = cprgGenerate 256 (dhCPRG st)
 
            modifyIORef stref $ \st' -> st'
+             -- SHA-1 produces a 40 digit hex string; reject longer inputs
              { dhLRU  = LRU.insert (T.take 40 dhReqHash) shared $ dhLRU st'
              , dhCPRG = cprg
              }

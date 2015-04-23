@@ -48,14 +48,18 @@ def getSignedCmd(cmd):
   sigCmd['cl-sig'] = [pubkeySha1, sig]
   return sigCmd
 
-parser = argparse.ArgumentParser(description='User configuration utility')
-
+# Get supported commands
 response = urllib2.urlopen('http://localhost:8000/info')
 data = json.load(response)
 
+commands = data['response']
+
+# Parser configuration
+parser = argparse.ArgumentParser(description='User configuration utility')
+
 subparsers = parser.add_subparsers(title='commands', dest='__command', help='-h gives command help')
 
-for _, command in data['response']:
+for _, command in commands:
   subparser = subparsers.add_parser(command['name'], help='Help for command')
 
   if 'options' in command:
@@ -65,7 +69,14 @@ for _, command in data['response']:
 args = parser.parse_args()
 
 cmd = getCmdFromArgs(args)
-sigCmd = getSignedCmd(cmd)
-response = urllib2.urlopen('http://localhost:8000/command', json.dumps(sigCmd))
+cmdInfo = dict(commands)[args.__command]
+
+if cmdInfo.get('auth', False) and args.password is None:
+  cmd = getSignedCmd(cmd)
+
+if 'ssh-key' in cmdInfo['options'] and cmd['ssh_key']:
+  cmd['ssh-key'] = "asd"
+
+response = urllib2.urlopen('http://localhost:8000/command', json.dumps(cmd))
 
 print(json.load(response))
