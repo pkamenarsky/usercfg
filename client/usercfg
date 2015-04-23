@@ -121,9 +121,9 @@ for _, command in commands:
     for option in command['options']:
       if not 'prompt' in option:
         if option['name'] == 'ssh-key':
-          subparser.add_argument('--' + option['name'], help=option['description'], action='store_true')
+          subparser.add_argument('-' + option['short'], '--' + option['name'], help=option['description'], action='store_true')
         else:
-          subparser.add_argument('--' + option['name'], help=option['description'])
+          subparser.add_argument('-' + option['short'], '--' + option['name'], help=option['description'])
 
 try:
   args = parser.parse_args()
