@@ -32,9 +32,9 @@ def listHasOption(options, option):
 def cmdHasOption(cmd, option):
   for k, v in cmd['cl-options']:
     if k == option:
-      return True
+      return v
 
-  return False
+  return None
 
 def cmdSetOption(cmd, option, value):
   option_exists = False
@@ -46,6 +46,9 @@ def cmdSetOption(cmd, option, value):
     cmd['cl-options'] = [[k, value] if k == option else [k, v] for k, v in cmd['cl-options']]
   else:
     cmd['cl-options'] = cmd['cl-options'] + [[option, value]]
+
+def cmdDeleteOption(cmd, option):
+  cmd['cl-options'] = [[k, v] for k, v in cmd['cl-options'] if k != option]
 
 def getSignedCmd(cmd):
   cmdString = getCmdString(cmd)
@@ -129,18 +132,11 @@ try:
   cmdInfo = dict(commands)[args.__command]
   cmdOptions = cmdInfo['options']
 
-  if listHasOption(cmdOptions, 'password') and not cmdHasOption(cmd, 'password'):
-    cmd = getSignedCmd(cmd)
-
-  if listHasOption(cmdOptions, 'ssh-key') and cmdHasOption(cmd, 'ssh-key'):
+  if listHasOption(cmdOptions, 'ssh-key') and cmdHasOption(cmd, 'ssh-key') == True:
     with open(home + '/.ssh/id_rsa.pub', 'r') as content_file:
       cmdSetOption(cmd, 'ssh-key', content_file.read())
-
-  for option in cmdOptions:
-    if 'prompt' in option:
-      cmdSetOption(cmd, option['name'], promptOption(option['prompt'], option['name']))
-
-  print cmd
+  else:
+    cmdDeleteOption(cmd, 'ssh-key')
 
   if 'confirm' in cmdInfo:
     answer = raw_input('Do you really want to do that? [Y/n]: ')
@@ -148,8 +144,29 @@ try:
     if answer != 'Y':
       sys.exit(0)
 
-  response = urllib2.urlopen('http://localhost:8000/command', json.dumps(cmd))
+  for option in cmdOptions:
+    if (('auth' in cmdInfo and option['name'] != 'password') or not 'auth' in cmdInfo) and 'prompt' in option:
+      cmdSetOption(cmd, option['name'], promptOption(option['prompt'], option['name']))
 
-  print json.load(response)
+  if 'auth' in cmdInfo:
+    cmd = getSignedCmd(cmd)
+
+  response = urllib2.urlopen('http://localhost:8000/command', json.dumps(cmd))
+  response = json.load(response)
+
+  if response['status'] == 'error' and response['error']['code'] == 'auth' and 'auth' in cmdInfo:
+    option = None
+    for o in cmdOptions:
+      if o['name'] == 'password':
+        option = o
+
+    if o != None:
+      cmdSetOption(cmd, option['name'], promptOption(option['prompt'], option['name']))
+
+      response = urllib2.urlopen('http://localhost:8000/command', json.dumps(cmd))
+      response = json.load(response)
+
+  print response
+
 except argparse.ArgumentError, exc:
     print exc.message, '\n', exc.argument

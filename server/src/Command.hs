@@ -58,7 +58,7 @@ userOption :: Option T.Text
 userOption = opt "name" "n" "User name" None
 
 passOption :: Option (Maybe T.Text)
-passOption = optMay "password" "p" "User password" None Nothing
+passOption = optMay "password" "p" "User password" Invisible Nothing
 
 instance Applicative Option where
   pure  = return
