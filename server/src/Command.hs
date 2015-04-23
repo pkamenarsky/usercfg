@@ -22,7 +22,7 @@ import           Model
 
 type Resolve a = ReaderT Keys Maybe a
 
-data Prompt = None | Prompt | Invisible
+data Prompt = None | Prompt | Invisible | PromptRepeat | InvisibleRepeat
 
 data Option a = Option
   { optName     :: T.Text
@@ -34,9 +34,11 @@ data Option a = Option
   } deriving Functor
 
 instance ToJSON Prompt where
-  toJSON None      = "none"
-  toJSON Prompt    = "prompt"
-  toJSON Invisible = "invisible"
+  toJSON None            = Null
+  toJSON Prompt          = toJSON ("prompt" :: T.Text, False)
+  toJSON Invisible       = toJSON ("invisible" :: T.Text, False)
+  toJSON PromptRepeat    = toJSON ("prompt" :: T.Text, True)
+  toJSON InvisibleRepeat = toJSON ("invisible" :: T.Text, True)
 
 instance ToJSON a => ToJSON (Option a) where
   toJSON Option {..}
