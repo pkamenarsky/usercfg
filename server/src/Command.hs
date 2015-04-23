@@ -120,8 +120,8 @@ instance FromJSON a => FromJSON (OneTuple a) where
   parseJSON _         = fail "Expected array when parsing tuple"
 
 instance ToJSON (Option a) => ToJSON (OneTuple (Option a)) where
-  toJSON (OneTuple opt@(Option {..})) | T.null optName = toJSON ([] :: [Int])
-                                      | otherwise      = toJSON [opt]
+  toJSON (OneTuple o@(Option {..})) | T.null optName = toJSON ([] :: [Int])
+                                    | otherwise      = toJSON [o]
 
 noArgs :: Data.Tuple.OneTuple.OneTuple (Option (Maybe ()))
 noArgs = OneTuple $ optMay "" "" "" None Nothing

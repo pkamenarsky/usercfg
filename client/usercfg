@@ -12,69 +12,48 @@ import os.path
 
 home = os.path.expanduser("~")
 
-user = 'phil'
-cmd = 'ping'
-options = [['ping', '666'], ['name', 'phil'], ['pong', '777']]
+def getCmdFromArgs(args):
+  return { 'cl-command': args.__command
+         , 'cl-options': [[k, v] for k, v in vars(args).items() if k != '__command' and v is not None]
+         }
 
-optionsHash = ''.join(sorted([k + v for k, v in options]))
+def getCmdString(cmd):
+  return cmd['cl-command'] + ''.join(sorted([k + v for k, v in cmd['cl-options']]))
 
-cmdHash =  cmd + optionsHash
+def getSignedCmd(cmd):
+  cmdString = getCmdString(cmd)
+  cmdHash = hashlib.sha1(cmdString).hexdigest()
+  response = urllib2.urlopen('http://localhost:8000/dh', json.dumps({ 'req-hash': cmdHash }))
 
-print cmdHash
+  svRandBlob = json.load(response)['response']
+  svRand = base64.b64decode(svRandBlob)
 
-response = urllib2.urlopen('http://localhost:8000/dh', json.dumps({ 'req-user': 'phil' }))
-
-svRandBlob = json.load(response)['response']
-svRand = base64.b64decode(svRandBlob)
-
-print svRand
-
-agent = paramiko.Agent()
-keys = agent.get_keys()
-
-if len(keys) < 1:
-  subprocess.call('ssh-add')
   agent = paramiko.Agent()
   keys = agent.get_keys()
 
-pubkeySha1 = ''
+  if len(keys) < 1:
+    subprocess.call('ssh-add')
+    agent = paramiko.Agent()
+    keys = agent.get_keys()
 
-with open(home + '/.ssh/id_rsa.pub', 'r') as content_file:
-  pubkey = content_file.read()
-  pubkeySha1 = hashlib.sha1(pubkey).hexdigest()
+  pubkeySha1 = ''
 
-  print(pubkeySha1)
+  with open(home + '/.ssh/id_rsa.pub', 'r') as content_file:
+    pubkey = content_file.read()
+    pubkeySha1 = hashlib.sha1(pubkey).hexdigest()
 
-sig = base64.b64encode(keys[0].sign_ssh_data(svRand + cmdHash))
+  sig = base64.b64encode(keys[0].sign_ssh_data(svRand + cmdString))
 
-print sig
-
-response = urllib2.urlopen('http://localhost:8000/command', json.dumps(
-  { 'cl-command' : 'create-user'
-  , 'cl-options': [ ['name', 'adi']
-                  , ['email', 'none']
-                  , ['password', 'none']
-                  , ['ssh-key', pubkey]
-                  ]
-  }))
-
-print(json.load(response))
-
-response = urllib2.urlopen('http://localhost:8000/command', json.dumps(
-  { 'cl-command' : cmd
-  , 'cl-user'    : user
-  , 'cl-options' : options
-  , 'cl-sig'     : [pubkeySha1, sig]
-  }))
-
-print(json.load(response))
+  sigCmd = dict(cmd)
+  sigCmd['cl-sig'] = [pubkeySha1, sig]
+  return sigCmd
 
 parser = argparse.ArgumentParser(description='User configuration utility')
 
 response = urllib2.urlopen('http://localhost:8000/info')
 data = json.load(response)
 
-subparsers = parser.add_subparsers(title='commands', help='-h gives command help')
+subparsers = parser.add_subparsers(title='commands', dest='__command', help='-h gives command help')
 
 for _, command in data['response']:
   subparser = subparsers.add_parser(command['name'], help='Help for command')
@@ -84,3 +63,9 @@ for _, command in data['response']:
       subparser.add_argument('--' + option['name'], help=option['description'])
 
 args = parser.parse_args()
+
+cmd = getCmdFromArgs(args)
+sigCmd = getSignedCmd(cmd)
+response = urllib2.urlopen('http://localhost:8000/command', json.dumps(sigCmd))
+
+print(json.load(response))

@@ -7,6 +7,7 @@ import           Control.Monad
 import           Control.Monad.Trans.Either
 import           Control.Monad.Reader
 
+import qualified Crypto.Hash.SHA1         as H
 import           Crypto.PubKey.OpenSsh
 import           Crypto.PubKey.HashDescr
 import           Crypto.PubKey.RSA.PKCS15
@@ -14,12 +15,13 @@ import           Crypto.Random
 
 import           Data.Aeson
 import qualified Data.ByteString          as B
+import qualified Data.ByteString.Base16   as B16
 import qualified Data.ByteString.Base64   as B64
 import qualified Data.ByteString.Char8    as BC
 import qualified Data.Cache.LRU           as LRU
 import           Data.Either.Combinators
 import           Data.IORef
-import qualified Data.Map               as M
+import qualified Data.Map                 as M
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Proxy
@@ -44,7 +46,12 @@ import           Command                  (Command (..), Option (..), userOption
 import           Commands
 import           Model
 
-import Debug.Trace
+#ifdef DEBUG
+import           Debug.Trace
+
+trc :: Show a => String -> a -> a
+trc str x = trace (str ++ ": " ++ show x) x
+#endif
 
 type Api = "info" :> Get Response
       :<|> "dh" :> ReqBody DhRequest :> Post Response
@@ -71,8 +78,6 @@ mbToET :: Monad m => e -> Maybe a -> EitherT e m a
 mbToET _ (Just x) = right x
 mbToET e Nothing  = left e
 
-trc str x = trace (str ++ ": " ++ show x) x
-
 authPubKey :: DhCmdRequest -> Maybe B.ByteString -> T.Text -> T.Text -> Either Error (M.Map T.Text T.Text -> Bool)
 authPubKey req shared sshHash sigBlob = do
   shared'  <- unpackShared shared
@@ -90,7 +95,7 @@ authPubKey req shared sshHash sigBlob = do
           pubkey' = join $ unpackPubKey . decodePublic . TE.encodeUtf8 <$> pubkey
       in fromMaybe False $ verify hashDescrSHA1
                        <$> pubkey'
-                       <*> pure (trc "hash" (shared' <> hashCmdRequest req))
+                       <*> pure (shared' <> hashCmdRequest req)
                        <*> pure sig
     where
       unpackShared (Just x) = Right x
@@ -123,7 +128,7 @@ runServer port bck cmds = do
            let (shared, cprg) = cprgGenerate 256 (dhCPRG st)
 
            modifyIORef stref $ \st' -> st'
-             { dhLRU  = LRU.insert dhReqUser shared $ dhLRU st'
+             { dhLRU  = LRU.insert (T.take 40 dhReqHash) shared $ dhLRU st'
              , dhCPRG = cprg
              }
 
@@ -134,7 +139,8 @@ runServer port bck cmds = do
 
           let userMay = lookup (optName userOption) dhClOptions
               passMay = lookup (optName passOption) dhClOptions
-              (lru', shared) = maybe (dhLRU st, Nothing) (flip LRU.delete (dhLRU st)) userMay
+              cmdHash = TE.decodeUtf8 $ B16.encode $ H.hash $ hashCmdRequest req
+              (lru', shared) = LRU.delete cmdHash $ dhLRU st
 
               mbToR r = maybe (return $ responseFail r)
 

@@ -6,7 +6,6 @@ import           Data.Aeson
 import qualified Data.Aeson             as A
 import qualified Data.ByteString        as B
 import           Data.List
-import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Map               as M
 import           Data.Proxy
@@ -92,7 +91,7 @@ data UserData = UserData
 
 deriveJSON' "usr" ''UserData
 
-data DhRequest    = DhRequest    { dhReqUser   :: T.Text }
+data DhRequest    = DhRequest    { dhReqHash   :: T.Text }
 data DhCmdRequest = DhCmdRequest { dhClCommand :: T.Text
                                  , dhClOptions :: Keys
                                  , dhClSig     :: Maybe (T.Text, T.Text)
