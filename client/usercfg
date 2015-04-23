@@ -14,11 +14,28 @@ home = os.path.expanduser("~")
 
 def getCmdFromArgs(args):
   return { 'cl-command': args.__command
-         , 'cl-options': [[k, v] for k, v in vars(args).items() if k != '__command' and v is not None]
+         , 'cl-options': [[k.replace('_', '-'), v] for k, v in vars(args).items() if k != '__command' and v is not None]
          }
 
 def getCmdString(cmd):
-  return cmd['cl-command'] + ''.join(sorted([k + v for k, v in cmd['cl-options']]))
+  return cmd['cl-command'] + ''.join(sorted([k + str(v) for k, v in cmd['cl-options']]))
+
+def listHasOption(options, option):
+  for v in options:
+    if v['name'] == option:
+      return True
+
+  return False
+
+def cmdHasOption(cmd, option):
+  for k, v in cmd['cl-options']:
+    if k == option:
+      return True
+
+  return False
+
+def cmdSetOption(cmd, option, value):
+ cmd['cl-options'] = [[k, value] if k == option else [k, v] for k, v in cmd['cl-options']]
 
 def getSignedCmd(cmd):
   cmdString = getCmdString(cmd)
@@ -64,19 +81,27 @@ for _, command in commands:
 
   if 'options' in command:
     for option in command['options']:
-      subparser.add_argument('--' + option['name'], help=option['description'])
+      if (option['name'] == 'ssh-key'):
+        subparser.add_argument('--' + option['name'], help=option['description'], action='store_true')
+      else:
+        subparser.add_argument('--' + option['name'], help=option['description'])
 
-args = parser.parse_args()
+try:
+  args = parser.parse_args()
 
-cmd = getCmdFromArgs(args)
-cmdInfo = dict(commands)[args.__command]
+  cmd = getCmdFromArgs(args)
+  cmdInfo = dict(commands)[args.__command]
+  cmdOptions = cmdInfo['options']
 
-if cmdInfo.get('auth', False) and args.password is None:
-  cmd = getSignedCmd(cmd)
+  if listHasOption(cmdOptions, 'password') and not cmdHasOption(cmd, 'password'):
+    cmd = getSignedCmd(cmd)
 
-if 'ssh-key' in cmdInfo['options'] and cmd['ssh_key']:
-  cmd['ssh-key'] = "asd"
+  if listHasOption(cmdOptions, 'ssh-key') and cmdHasOption(cmd, 'ssh-key'):
+    with open(home + '/.ssh/id_rsa.pub', 'r') as content_file:
+      cmdSetOption(cmd, 'ssh-key', content_file.read())
 
-response = urllib2.urlopen('http://localhost:8000/command', json.dumps(cmd))
+  response = urllib2.urlopen('http://localhost:8000/command', json.dumps(cmd))
 
-print(json.load(response))
+  print json.load(response)
+except argparse.ArgumentError, exc:
+    print exc.message, '\n', exc.argument
