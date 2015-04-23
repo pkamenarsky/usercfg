@@ -65,7 +65,7 @@ cmdCreateUser :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
 cmdCreateUser = cmd "create-user" False
     ( userOption
     , opt    "email" "e" "User mail" None
-    , opt    "password" "p" "User password" None -- make optional, generate random password
+    , opt    "password" "p" "User password" InvisibleRepeat -- make optional, generate random password
     , optMay "number" "N" "User number" None Nothing
     , optMay "ssh-key" "S" "SSH public key" None Nothing
     ) $ \u_name u_email password usrNumber sshKey bck -> do

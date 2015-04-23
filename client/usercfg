@@ -10,6 +10,7 @@ import base64
 import hashlib
 import os.path
 import sys
+import getpass
 
 home = os.path.expanduser("~")
 
@@ -36,7 +37,15 @@ def cmdHasOption(cmd, option):
   return False
 
 def cmdSetOption(cmd, option, value):
- cmd['cl-options'] = [[k, value] if k == option else [k, v] for k, v in cmd['cl-options']]
+  option_exists = False
+  for k, v in cmd['cl-options']:
+    if k == option:
+      option_exists = True
+
+  if option_exists:
+    cmd['cl-options'] = [[k, value] if k == option else [k, v] for k, v in cmd['cl-options']]
+  else:
+    cmd['cl-options'] = cmd['cl-options'] + [[option, value]]
 
 def getSignedCmd(cmd):
   cmdString = getCmdString(cmd)
@@ -66,6 +75,31 @@ def getSignedCmd(cmd):
   sigCmd['cl-sig'] = [pubkeySha1, sig]
   return sigCmd
 
+def _promptOption(prompt_type, prefix, option):
+  value = ''
+
+  if prompt_type == 'prompt':
+    value = raw_input(prefix + option + ': ')
+  else:
+    if prompt_type == 'invisible':
+      value = getpass.getpass(prefix + option + ': ')
+
+  return value
+
+def promptOption(prompt, option):
+  prompt_type, repeat = prompt
+
+  value = _promptOption(prompt_type, 'Enter ', option)
+
+  if repeat:
+    value2 = _promptOption(prompt_type, 'Repeat ', option)
+
+    if value != value2:
+      print 'Entered values do not match'
+      sys.exit(0)
+
+  return value
+
 # Get supported commands
 response = urllib2.urlopen('http://localhost:8000/info')
 data = json.load(response)
@@ -82,10 +116,11 @@ for _, command in commands:
 
   if 'options' in command:
     for option in command['options']:
-      if (option['name'] == 'ssh-key'):
-        subparser.add_argument('--' + option['name'], help=option['description'], action='store_true')
-      else:
-        subparser.add_argument('--' + option['name'], help=option['description'])
+      if not 'prompt' in option:
+        if option['name'] == 'ssh-key':
+          subparser.add_argument('--' + option['name'], help=option['description'], action='store_true')
+        else:
+          subparser.add_argument('--' + option['name'], help=option['description'])
 
 try:
   args = parser.parse_args()
@@ -100,6 +135,12 @@ try:
   if listHasOption(cmdOptions, 'ssh-key') and cmdHasOption(cmd, 'ssh-key'):
     with open(home + '/.ssh/id_rsa.pub', 'r') as content_file:
       cmdSetOption(cmd, 'ssh-key', content_file.read())
+
+  for option in cmdOptions:
+    if 'prompt' in option:
+      cmdSetOption(cmd, option['name'], promptOption(option['prompt'], option['name']))
+
+  print cmd
 
   if 'confirm' in cmdInfo:
     answer = raw_input('Do you really want to do that? [Y/n]: ')
