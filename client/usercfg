@@ -9,6 +9,7 @@ import paramiko.agent
 import base64
 import hashlib
 import os.path
+import sys
 
 home = os.path.expanduser("~")
 
@@ -99,6 +100,12 @@ try:
   if listHasOption(cmdOptions, 'ssh-key') and cmdHasOption(cmd, 'ssh-key'):
     with open(home + '/.ssh/id_rsa.pub', 'r') as content_file:
       cmdSetOption(cmd, 'ssh-key', content_file.read())
+
+  if 'confirm' in cmdInfo:
+    answer = raw_input('Do you really want to do that? [Y/n]: ')
+
+    if answer != 'Y':
+      sys.exit(0)
 
   response = urllib2.urlopen('http://localhost:8000/command', json.dumps(cmd))
 
