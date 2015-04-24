@@ -72,7 +72,7 @@ def getSignedCmd(cmd):
     pubkey = content_file.read()
     pubkeySha1 = hashlib.sha1(pubkey).hexdigest()
 
-  sig = base64.b64encode(keys[0].sign_ssh_data(svRand + cmdString))
+  sig = base64.b64encode(keys[0].sign_ssh_data(svRand + cmdString.encode('utf-8')))
 
   sigCmd = dict(cmd)
   sigCmd['cl-sig'] = [pubkeySha1, sig]
@@ -92,10 +92,10 @@ def _promptOption(prompt_type, prefix, option):
 def promptOption(prompt, option):
   prompt_type, repeat = prompt
 
-  value = _promptOption(prompt_type, 'Enter ', option)
+  value = _promptOption(prompt_type, 'Enter ', option.replace('-', ' '))
 
   if repeat:
-    value2 = _promptOption(prompt_type, 'Repeat ', option)
+    value2 = _promptOption(prompt_type, 'Repeat ', option.replace('-', ' '))
 
     if value != value2:
       print 'Entered values do not match'
@@ -150,12 +150,16 @@ try:
       cmdSetOption(cmd, option['name'], promptOption(option['prompt'], option['name']))
 
   if 'auth' in cmdInfo:
+    print 'Trying pubkey auth...',
     cmd = getSignedCmd(cmd)
 
   response = urllib2.urlopen('http://localhost:8000/command', json.dumps(cmd))
   response = json.load(response)
 
   if response['status'] == 'error' and response['error']['code'] == 'auth' and 'auth' in cmdInfo:
+    if 'auth' in cmdInfo:
+      print 'failed'
+
     option = None
     for o in cmdOptions:
       if o['name'] == 'password':
@@ -166,8 +170,12 @@ try:
 
       response = urllib2.urlopen('http://localhost:8000/command', json.dumps(cmd))
       response = json.load(response)
+  else:
+    if 'auth' in cmdInfo:
+      print 'ok'
 
-  print response
+  if response['status'] == 'error':
+    print 'Command execution failed: ' + response['error']['code']
 
 except argparse.ArgumentError, exc:
     print exc.message, '\n', exc.argument

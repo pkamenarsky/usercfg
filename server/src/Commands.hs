@@ -12,6 +12,7 @@ import qualified Data.ByteString.Base16     as B16
 import           Data.List                  (intercalate)
 import           Data.List.Split            (splitOn)
 import qualified Data.Map                   as M
+import           Data.Maybe
 import qualified Data.Text                  as T
 import qualified Data.Text.Encoding         as TE
 import           Data.Tuple.OneTuple
@@ -94,11 +95,41 @@ cmdCreateUser = cmd "create-user" False
                  , ..
                  })
 
+cmdUpdateUser :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
+cmdUpdateUser = cmdAuth "update-user" False
+  ( optMay "email" "e" "User mail" None Nothing
+  , optMay "number" "N" "User number" None Nothing
+  , optMay "ssh-key" "S" "SSH public key" None Nothing
+  ) $ \email newUsrNumber sshKey uid bck -> do
+      let sshKeyHash = maybe "" (TE.decodeUtf8 . B16.encode . H.hash . TE.encodeUtf8) sshKey
+
+      either (return . responseFail . UserStorageBackendError)
+             (const $ return responseOk) =<<
+               updateUser bck uid (\old -> old
+                 { u_more = (u_more old)
+                     { usrSshKeys = maybe (usrSshKeys $ u_more old) (flip (M.insert sshKeyHash) (usrSshKeys $ u_more old)) sshKey
+                     , usrNumber  = fromMaybe (usrNumber $ u_more old) newUsrNumber
+                     }
+                 , u_email = fromMaybe (u_email old) email
+                 })
+
+cmdUpdatePassword :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
+cmdUpdatePassword = cmdAuth "update-password" False
+  ( OneTuple $ opt "new-password" "P" "New user passord" InvisibleRepeat
+  ) $ \newPassword uid bck -> do
+      either (return . responseFail . UserStorageBackendError)
+             (const $ return responseOk) =<<
+               updateUser bck uid (\old -> old
+                 { u_password = makePassword $ PasswordPlain newPassword
+                 } :: User UserData)
+
 commands :: UserStorageBackend bck => [(T.Text, Command bck (IO Response))]
 commands =
   [ cmdCreateUser
+  , cmdUpdateUser
   , cmdResetPassword
   , cmdAuth "delete-user" True noArgs $ \_ uid bck -> deleteUser bck uid >> return responseOk
   , cmdPing
   , cmdApplyPassword
+  , cmdUpdatePassword
   ]
