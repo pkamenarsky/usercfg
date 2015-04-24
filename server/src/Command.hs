@@ -29,6 +29,7 @@ data Option a = Option
   , optShort    :: T.Text
   , optDesc     :: T.Text
   , optDefault  :: Maybe a
+  , optRequired :: Bool
   , optPrompt   :: Prompt
   , optResolve  :: Resolve a
   } deriving Functor
@@ -48,17 +49,21 @@ instance ToJSON a => ToJSON (Option a) where
       , "short"       .= optShort
       , "description" .= optDesc
       , "default"     .= optDefault
+      , "required"    .= optRequired
       , "prompt"      .= optPrompt
       ]
 
 emptyOption :: Option a
-emptyOption = Option { optName = "", optShort = "", optDesc = "", optPrompt = None, optDefault = Nothing, optResolve = undefined }
+emptyOption = Option { optName = "", optShort = "", optDesc = "", optRequired = False, optPrompt = None, optDefault = Nothing, optResolve = undefined }
 
 userOption :: Option T.Text
 userOption = opt "name" "n" "User name" None
 
-passOption :: Option (Maybe T.Text)
-passOption = optMay "password" "p" "User password" Invisible Nothing
+passOption :: Option T.Text
+passOption = opt "password" "p" "User password" InvisibleRepeat
+
+passOptionMay :: Option (Maybe T.Text)
+passOptionMay = optMay "password" "p" "User password" Invisible Nothing
 
 instance Applicative Option where
   pure  = return
@@ -84,15 +89,17 @@ instance Readable a => Readable (Maybe a) where
 
 opt :: Readable a => T.Text -> T.Text -> T.Text -> Prompt -> Option a
 opt optName optShort optDesc optPrompt = Option
-  { optResolve = ReaderT $ \keys -> join $ read' <$> lookup optName keys
-  , optDefault = Nothing
+  { optResolve  = ReaderT $ \keys -> join $ read' <$> lookup optName keys
+  , optDefault  = Nothing
+  , optRequired = True
   , ..
   }
 
 optMay :: Readable a => T.Text -> T.Text -> T.Text -> Prompt -> Maybe a -> Option (Maybe a)
 optMay optName optShort optDesc optPrompt optDefault' = Option
-  { optResolve = ReaderT $ \keys -> (join $ read' <$> lookup optName keys) <|> Just optDefault'
-  , optDefault = Just optDefault'
+  { optResolve  = ReaderT $ \keys -> (join $ read' <$> lookup optName keys) <|> Just optDefault'
+  , optDefault  = Just optDefault'
+  , optRequired = False
   , ..
   }
 
@@ -112,7 +119,7 @@ instance ToJSON (Command bck r) where
     ]
     where
       amendOpts os@(Array a)
-        | isRight cmdFn = Array (toJSON userOption `V.cons` (toJSON passOption `V.cons` a))
+        | isRight cmdFn = Array (toJSON userOption `V.cons` (toJSON passOptionMay `V.cons` a))
         | otherwise     = os
       amendOpts os      = os
 
