@@ -103,30 +103,33 @@ def promptOption(prompt, option):
 
   return value
 
-# Get supported commands
-response = urllib2.urlopen('http://localhost:8000/info')
-data = json.load(response)
-
-commands = data['response']
-
-# Parser configuration
-parser = argparse.ArgumentParser(description='User configuration utility')
-
-subparsers = parser.add_subparsers(title='commands', dest='__command', help='-h gives command help')
-
-for _, command in commands:
-  subparser = subparsers.add_parser(command['name'], help='Help for command')
-
-  if 'options' in command:
-    for option in command['options']:
-      if not 'prompt' in option:
-        opt_required = option.get('required', False)
-        if option['name'] == 'ssh-key':
-          subparser.add_argument('-' + option['short'], '--' + option['name'], help=option['description'], action='store_true', required=opt_required)
-        else:
-          subparser.add_argument('-' + option['short'], '--' + option['name'], help=option['description'], required=opt_required)
-
 try:
+# Parser configuration
+  parser = argparse.ArgumentParser(description='User configuration utility')
+  parser.add_argument('host')
+
+  # args, extra = parser.parse_known_args()
+
+# Get supported commands
+  response = urllib2.urlopen(sys.argv[1] + '/info')
+  data = json.load(response)
+
+  commands = data['response']
+
+  subparsers = parser.add_subparsers(title='commands', dest='__command', help='-h gives command help')
+
+  for _, command in commands:
+    subparser = subparsers.add_parser(command['name'], help=command['description'])
+
+    if 'options' in command:
+      for option in command['options']:
+        if not 'prompt' in option:
+          opt_required = option.get('required', False)
+          if option['name'] == 'ssh-key':
+            subparser.add_argument('-' + option['short'], '--' + option['name'], help=option['description'], action='store_true', required=opt_required)
+          else:
+            subparser.add_argument('-' + option['short'], '--' + option['name'], help=option['description'], required=opt_required)
+
   args = parser.parse_args()
 
   cmd = getCmdFromArgs(args)
