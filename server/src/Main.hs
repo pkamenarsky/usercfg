@@ -109,8 +109,6 @@ runServer port bck cmds = do
   ep    <- createEntropyPool
   stref <- newIORef $ DhData (LRU.newLRU $ Just 10000) (cprgCreate ep)
 
-  initUserBackend bck
-
   runServer' stref
   where
     runServer' stref = run port $ serve api $ info
@@ -145,16 +143,19 @@ runServer port bck cmds = do
 
               mbToR r = maybe (return $ responseFail r)
 
+              verifyUserPassword :: T.Text -> User UserData -> Bool
+              verifyUserPassword pass = verifyPassword (PasswordPlain pass) . u_password
+
               auth cmd
                 | Just pass <- passMay
                 , Just user <- userMay = do
-                    r <- withAuthUser bck user (PasswordPlain pass) cmd
+                    r <- withAuthUser bck user (verifyUserPassword pass) cmd
                     mbToR AuthError return r
                 | Just (keyHash, sig) <- dhClSig
                 , Just user           <- userMay = runEitherT $ do
                     f <- hoistEither $ authPubKey req shared keyHash sig
                     r <- liftIO
-                       $ withAuthUserByUserData bck user (f . usrSshKeys) cmd
+                       $ withAuthUser bck user (f . usrSshKeys . u_more) cmd
                     hoistEither $ maybe (Left AuthError) id r
                 | otherwise = return $ responseFail AuthNeededError
 
@@ -188,6 +189,8 @@ main = do
   port <- read . fromMaybe "8000" <$> lookupEnv "PORT"
 
   bck <- connectPostgreSQL $ BC.pack dburl
+
+  initUserBackend bck
   housekeepBackend bck
 
   runServer port bck commands

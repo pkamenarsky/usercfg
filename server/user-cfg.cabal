@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                user-cfg
-version:             0.1.0.0
+version:             0.2.0.0
 -- synopsis:            
 -- description:         
 license:             MIT
@@ -63,9 +63,9 @@ executable user-cfg
                        text,
                        transformers,
                        tuple,
-                       users >= 0.2.0.2,
-                       users-postgresql-simple >= 0.2.0.2,
-                       users-test >= 0.2.0.2,
+                       users >= 0.3.0.0,
+                       users-postgresql-simple >= 0.3.0.0,
+                       users-test >= 0.3.0.0,
                        vector,
                        warp
   hs-source-dirs:      src
