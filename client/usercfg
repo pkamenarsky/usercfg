@@ -50,10 +50,10 @@ def cmdSetOption(cmd, option, value):
 def cmdDeleteOption(cmd, option):
   cmd['cl-options'] = [[k, v] for k, v in cmd['cl-options'] if k != option]
 
-def getSignedCmd(cmd):
+def getSignedCmd(host, cmd):
   cmdString = getCmdString(cmd)
   cmdHash = hashlib.sha1(cmdString).hexdigest()
-  response = urllib2.urlopen('http://localhost:8000/dh', json.dumps({ 'req-hash': cmdHash }))
+  response = urllib2.urlopen(host + '/dh', json.dumps({ 'req-hash': cmdHash }))
 
   svRandBlob = json.load(response)['response']
   svRand = base64.b64decode(svRandBlob)
@@ -167,9 +167,9 @@ try:
 
   if 'auth' in cmdInfo:
     print 'Trying pubkey auth...',
-    cmd = getSignedCmd(cmd)
+    cmd = getSignedCmd(host, cmd)
 
-  response = urllib2.urlopen('http://localhost:8000/command', json.dumps(cmd))
+  response = urllib2.urlopen(host + '/command', json.dumps(cmd))
   response = json.load(response)
 
   if response['status'] == 'error' and response['error']['code'] == 'auth' and 'auth' in cmdInfo:
@@ -184,7 +184,7 @@ try:
     if o != None:
       cmdSetOption(cmd, option['name'], promptOption(option['prompt'], option['name']))
 
-      response = urllib2.urlopen('http://localhost:8000/command', json.dumps(cmd))
+      response = urllib2.urlopen(host + '/command', json.dumps(cmd))
       response = json.load(response)
   else:
     if 'auth' in cmdInfo:
