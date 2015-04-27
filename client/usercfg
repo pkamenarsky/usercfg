@@ -104,12 +104,17 @@ def promptOption(prompt, option):
   return value
 
 def getHost():
-  if len(sys.argv) > 1 and sys.argv[1] != '-h':
-    return sys.argv[1]
-  elif len(sys.argv) > 2 and sys.argv[2] != '-h':
-    return sys.argv[2]
+  host = None
 
-  return None
+  if len(sys.argv) > 1 and sys.argv[1] != '-h':
+    host = sys.argv[1]
+  elif len(sys.argv) > 2 and sys.argv[2] != '-h':
+    host = sys.argv[2]
+
+  if host != None and (not host.startswith('http') and not host.startswith('https')):
+    host = 'http://' + host
+
+  return host
 
 try:
 # Parser configuration
