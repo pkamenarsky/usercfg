@@ -103,32 +103,40 @@ def promptOption(prompt, option):
 
   return value
 
+def getHost():
+  if len(sys.argv) > 1 and sys.argv[1] != '-h':
+    return sys.argv[1]
+  elif len(sys.argv) > 2 and sys.argv[2] != '-h':
+    return sys.argv[2]
+
+  return None
+
 try:
 # Parser configuration
   parser = argparse.ArgumentParser(description='User configuration utility')
   parser.add_argument('host')
 
-  # args, extra = parser.parse_known_args()
-
 # Get supported commands
-  response = urllib2.urlopen(sys.argv[1] + '/info')
-  data = json.load(response)
+  host = getHost()
+  if host != None:
+    response = urllib2.urlopen(host + '/info')
+    data = json.load(response)
 
-  commands = data['response']
+    commands = data['response']
 
-  subparsers = parser.add_subparsers(title='commands', dest='__command', help='-h gives command help')
+    subparsers = parser.add_subparsers(title='commands', dest='__command', help='-h gives command help')
 
-  for _, command in commands:
-    subparser = subparsers.add_parser(command['name'], help=command['description'])
+    for _, command in commands:
+      subparser = subparsers.add_parser(command['name'], help=command['description'])
 
-    if 'options' in command:
-      for option in command['options']:
-        if not 'prompt' in option:
-          opt_required = option.get('required', False)
-          if option['name'] == 'ssh-key':
-            subparser.add_argument('-' + option['short'], '--' + option['name'], help=option['description'], action='store_true', required=opt_required)
-          else:
-            subparser.add_argument('-' + option['short'], '--' + option['name'], help=option['description'], required=opt_required)
+      if 'options' in command:
+        for option in command['options']:
+          if not 'prompt' in option:
+            opt_required = option.get('required', False)
+            if option['name'] == 'ssh-key':
+              subparser.add_argument('-' + option['short'], '--' + option['name'], help=option['description'], action='store_true', required=opt_required)
+            else:
+              subparser.add_argument('-' + option['short'], '--' + option['name'], help=option['description'], required=opt_required)
 
   args = parser.parse_args()
 
