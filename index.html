@@ -15,7 +15,6 @@
 
   <!-- FONT
   –––––––––––––––––––––––––––––––––––––––––––––––––– -->
-  <link href="//fonts.googleapis.com/css?family=Raleway:400,300,600" rel="stylesheet" type="text/css">
   <link href='http://fonts.googleapis.com/css?family=Roboto:300' rel='stylesheet' type='text/css'>
 
   <!-- CSS
@@ -44,12 +43,14 @@
         </p>
         <p> The reference implementation is based on a flexible protocol specification proposal allowing a conforming server to offer a wide variety of account managament commands. Those are then presented to the user by a client-side command line tool.
         </p>
+        <p> Check out the <a href="https://github.com/pkamenarsky/usercfg">GitHub project page</a> if you want to contribute.
+        </p>
       </div>
     </div>
     <div class="row">
       <div class="twelve columns" style="margin-top: 5%">
         <h5>INSTALL</h5>
-        <p>wget blabla</p>
+        <pre>wget blabla</pre>
       </div>
     </div>
 
@@ -61,7 +62,7 @@
 
     <div class="row">
       <div class="six columns">
-        <p>usercfg create-user -n NAME -e EMAIL --ssh-key</p>
+        <pre>usercfg example.com create-user -n NAME -e EMAIL --ssh-key</pre>
       </div>
       <div class="six columns">
         <p>Creates a new user. --ssh-key allows for the automatic upload of your public ssh key.</p>
@@ -70,8 +71,8 @@
 
     <div class="row">
       <div class="six columns">
-        <p>usercfg update-user -n NAME -e EMAIL ...</p>
-        <p>usercfg delete-user -n NAME</p>
+        <pre>usercfg example.com update-user -n NAME -e NEW-EMAIL</pre>
+        <pre>usercfg example.com delete-user -n NAME</pre>
       </div>
     </div>
   </div>
