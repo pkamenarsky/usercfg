@@ -109,8 +109,6 @@ runServer port bck cmds = do
   ep    <- createEntropyPool
   stref <- newIORef $ DhData (LRU.newLRU $ Just 10000) (cprgCreate ep)
 
-  initUserBackend bck
-
   runServer' stref
   where
     runServer' stref = run port $ serve api $ info
@@ -188,6 +186,8 @@ main = do
   port <- read . fromMaybe "8000" <$> lookupEnv "PORT"
 
   bck <- connectPostgreSQL $ BC.pack dburl
+
+  initUserBackend bck
   housekeepBackend bck
 
   runServer port bck commands

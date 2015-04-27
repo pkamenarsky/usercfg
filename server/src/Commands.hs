@@ -26,6 +26,9 @@ import           Web.Users.Types
 import           Model
 import           Command
 
+class MailBackend bck where
+  sendMail :: bck -> PasswordResetToken -> IO ()
+
 cmdPing :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
 cmdPing = cmdAuth "ping" True
   ( opt "ping" "i" "Ping" None
@@ -37,7 +40,7 @@ cmdPing = cmdAuth "ping" True
 
       return responseOk
 
-cmdResetPassword :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
+cmdResetPassword :: (UserStorageBackend bck, MailBackend bck) => (T.Text, Command bck (IO Response))
 cmdResetPassword = cmd "reset-password" False
   (OneTuple userOption) $ \username bck -> do
     runMaybeT $ do
@@ -45,6 +48,15 @@ cmdResetPassword = cmd "reset-password" False
       user   <- MaybeT $ getUserById bck userId :: MaybeT IO (User UserData)
       token  <- MaybeT $ Just <$> requestPasswordReset bck userId 1000000
 
+      liftIO $ sendMail bck token
+      {-
+      liftIO $ sendMail $ Mail
+          { to      = T.unpack $ u_email user
+          , from    = sgFrom
+          , subject = sgSubject
+          , text    = intercalate ( T.unpack $ unPasswordResetToken token )
+                                  $ splitOn "$TOKEN" sgText
+          }
       liftIO $ print token
 
       sgUser <- MaybeT $ lookupEnv "SG_USER"
@@ -53,14 +65,18 @@ cmdResetPassword = cmd "reset-password" False
       sgSubj <- MaybeT $ lookupEnv "SG_SUBJ"
       sgText <- MaybeT $ lookupEnv "SG_TEXT"
 
-      liftIO $ SG.sendEmail (SG.Authentication sgUser sgPass)
+      liftIO $ SG.sendEmail (SG.Authentication sgUsername sgPassword)
         $ SG.EmailMessage
           { to      = T.unpack $ u_email user
           , from    = sgFrom
-          , subject = sgSubj
+          , subject = sgSubject
+          {-
           , text    = intercalate ( T.unpack $ unPasswordResetToken token )
                                   $ splitOn "$TOKEN" sgText
+          -}
+          , text    = sgText $ T.unpack $ unPasswordResetToken token
           }
+      -}
 
     return responseOk
 
@@ -123,7 +139,7 @@ cmdUpdatePassword = cmdAuth "update-password" False
                  { u_password = makePassword $ PasswordPlain newPassword
                  } :: User UserData)
 
-commands :: UserStorageBackend bck => [(T.Text, Command bck (IO Response))]
+commands :: (MailBackend bck, UserStorageBackend bck) => [(T.Text, Command bck (IO Response))]
 commands =
   [ cmdCreateUser
   , cmdUpdateUser
