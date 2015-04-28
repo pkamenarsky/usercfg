@@ -38,13 +38,16 @@
         <h2 style="margin-left: -0.84em">$ usercfg</h2>
         <!-- <h5>account management for developers</h5> -->
         <p> usercfg is an account management tool for developers.
-        <p> Given a server implementing the specification, it allows for easy and passwordless command-line management of multiple accounts on multiple sites.
+        <p> Given a server implementing the specification, it offers easy and passwordless command-line management of multiple accounts on multiple sites.
+            The flexible protocol allows for all needed account managament commands without restriction.
         </p>
         <p> For more information, check out the <a href="https://github.com/pkamenarsky/usercfg">GitHub project page</a>.
         </p>
       </div>
     </div>
 
+    <!-- INSTALL header
+    –––––––––––––––––––––––––––––––––––––––––––––––––– -->
     <div class="row">
       <div class="twelve columns" style="margin-top: 3%">
         <h5>INSTALL</h5>
@@ -52,28 +55,49 @@
       </div>
     </div>
 
+    <!-- EXAMPLES header
+    –––––––––––––––––––––––––––––––––––––––––––––––––– -->
     <div class="row">
       <div class="twelve columns" style="margin-top: 3%">
         <h5>EXAMPLES</h5>
       </div>
     </div>
 
+    <!-- Example
+    –––––––––––––––––––––––––––––––––––––––––––––––––– -->
     <div class="row">
       <div class="six columns">
         <pre>usercfg example.com create-user -n NAME -e EMAIL --ssh-key</pre>
       </div>
       <div class="six columns">
-        <p>Creates a new user. --ssh-key allows for the automatic upload of your public ssh key.</p>
+        <p>Create a new user. --ssh-key allows for the automatic upload of the user's public ssh key.</p>
       </div>
     </div>
 
+    <!-- Example
+    –––––––––––––––––––––––––––––––––––––––––––––––––– -->
     <div class="row">
       <div class="six columns">
-        <pre>usercfg example.com update-user -n NAME -e NEW-EMAIL</pre>
-        <pre>usercfg example.com delete-user -n NAME</pre>
+        <pre>usercfg example.com request-password -n NAME</pre>
+      </div>
+      <div class="six columns">
+        <p>Request a password reset token to the email address registered by the user.</p>
       </div>
     </div>
 
+    <!-- Example
+    –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+    <div class="row">
+      <div class="six columns">
+        <pre>usercfg example.com add-payment -n NAME -t monthly --plan silver </pre>
+      </div>
+      <div class="six columns">
+        <p>Add a payment plan to the user's account.</p>
+      </div>
+    </div>
+
+    <!-- Footer whitespace
+    –––––––––––––––––––––––––––––––––––––––––––––––––– -->
     <div class="twelve columns" style="margin-top: 15%">
     </div>
 
