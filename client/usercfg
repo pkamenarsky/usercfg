@@ -12,6 +12,8 @@ import os.path
 import sys
 import getpass
 
+version = "0.2.0.0"
+
 home = os.path.expanduser("~")
 
 def getCmdFromArgs(args):
@@ -116,6 +118,11 @@ def getHost():
 
   return host
 
+# http://stackoverflow.com/a/1714276/634020
+def compare_version(v1, v2):
+    return cmp(*tuple(zip(*map(lambda x, y: (x or 0, y or 0),
+           [int(x) for x in v1.split('.')], [int(y) for y in v2.split('.')]))))
+
 try:
 # Parser configuration
   parser = argparse.ArgumentParser(description='User configuration utility')
@@ -127,7 +134,14 @@ try:
     response = urllib2.urlopen(host + '/info')
     data = json.load(response)
 
-    commands = data['response']
+    info = data['response']
+    commands = info['commands']
+    sv_version = info['version']
+
+    if compare_version(sv_version, version) > 0:
+      print 'Unsupported server version (' + sv_version + ' > ' + version + ')'
+      print 'Please go to http://pkamenarsky.github.io/usercfg and update'
+      sys.exit(0)
 
     subparsers = parser.add_subparsers(title='commands', dest='__command', help='-h gives command help')
 

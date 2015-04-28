@@ -26,7 +26,9 @@ import           Data.Maybe
 import           Data.Monoid
 import           Data.Proxy
 import           Data.Serialize.Get       (getWord32be, getWord8, runGet)
+import qualified Data.Text                as T
 import qualified Data.Text.Encoding       as TE
+import           Data.Version
 
 import           Database.PostgreSQL.Simple
 
@@ -35,8 +37,6 @@ import           Servant.Server
 
 import           Web.Users.Types
 import           Web.Users.Postgresql     ()
-
-import qualified Data.Text                as T
 
 import           Network.Wai.Handler.Warp
 
@@ -120,7 +120,10 @@ runServer port bck cmds = do
                                          :<|> printState
 #endif
       where
-        info = return $ response $ toJSON cmds
+        info = return $ response $ object'
+          [ "commands" .= cmds
+          , "version"  .= showVersion version
+          ]
 
         dh DhRequest {..} = liftIO $ do
            st <- readIORef stref
