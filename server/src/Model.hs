@@ -102,8 +102,8 @@ hashCmdRequest DhCmdRequest {..} =
   TE.encodeUtf8 $ dhClCommand
                <> (T.concat $ sort $ map (uncurry T.append) dhClOptions)
 
-deriveJSON' "dh" ''DhRequest
-deriveJSON' "dh" ''DhCmdRequest
+deriveJSON' "dhReq" ''DhRequest
+deriveJSON' "dhCl" ''DhCmdRequest
 
 type Response = Either Error Value
 

@@ -46,6 +46,8 @@ import           Command                  (Command (..), Option (..), userOption
 import           Commands
 import           Model
 
+import           Paths_usercfg
+
 #ifdef DEBUG
 import           Debug.Trace
 

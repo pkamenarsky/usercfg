@@ -15,12 +15,12 @@ import getpass
 home = os.path.expanduser("~")
 
 def getCmdFromArgs(args):
-  return { 'cl-command': args.__command
-         , 'cl-options': [[k.replace('_', '-'), v] for k, v in vars(args).items() if k != '__command' and v is not None]
+  return { 'command': args.__command
+         , 'options': [[k.replace('_', '-'), v] for k, v in vars(args).items() if k != '__command' and v is not None]
          }
 
 def getCmdString(cmd):
-  return cmd['cl-command'] + ''.join(sorted([k + str(v) for k, v in cmd['cl-options']]))
+  return cmd['command'] + ''.join(sorted([k + str(v) for k, v in cmd['options']]))
 
 def listHasOption(options, option):
   for v in options:
@@ -30,7 +30,7 @@ def listHasOption(options, option):
   return False
 
 def cmdHasOption(cmd, option):
-  for k, v in cmd['cl-options']:
+  for k, v in cmd['options']:
     if k == option:
       return v
 
@@ -38,22 +38,22 @@ def cmdHasOption(cmd, option):
 
 def cmdSetOption(cmd, option, value):
   option_exists = False
-  for k, v in cmd['cl-options']:
+  for k, v in cmd['options']:
     if k == option:
       option_exists = True
 
   if option_exists:
-    cmd['cl-options'] = [[k, value] if k == option else [k, v] for k, v in cmd['cl-options']]
+    cmd['options'] = [[k, value] if k == option else [k, v] for k, v in cmd['options']]
   else:
-    cmd['cl-options'] = cmd['cl-options'] + [[option, value]]
+    cmd['options'] = cmd['options'] + [[option, value]]
 
 def cmdDeleteOption(cmd, option):
-  cmd['cl-options'] = [[k, v] for k, v in cmd['cl-options'] if k != option]
+  cmd['options'] = [[k, v] for k, v in cmd['options'] if k != option]
 
 def getSignedCmd(host, cmd):
   cmdString = getCmdString(cmd)
   cmdHash = hashlib.sha1(cmdString).hexdigest()
-  response = urllib2.urlopen(host + '/dh', json.dumps({ 'req-hash': cmdHash }))
+  response = urllib2.urlopen(host + '/dh', json.dumps({ 'hash': cmdHash }))
 
   svRandBlob = json.load(response)['response']
   svRand = base64.b64decode(svRandBlob)
@@ -75,7 +75,7 @@ def getSignedCmd(host, cmd):
   sig = base64.b64encode(keys[0].sign_ssh_data(svRand + cmdString.encode('utf-8')))
 
   sigCmd = dict(cmd)
-  sigCmd['cl-sig'] = [pubkeySha1, sig]
+  sigCmd['sig'] = [pubkeySha1, sig]
   return sigCmd
 
 def _promptOption(prompt_type, prefix, option):
