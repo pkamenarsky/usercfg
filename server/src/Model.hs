@@ -44,6 +44,7 @@ data Error = forall e. ToJSON e => UserStorageBackendError e
            | AuthKeyError
            | AuthPassError
            | AuthNeededError
+           | CouldNotSendMailError
 
 instance ToJSON CreateUserError where
   toJSON UsernameOrEmailAlreadyTaken = A.String "create_user_user_or_email_taken"
@@ -60,6 +61,7 @@ instance ToJSON Error where
   toJSON (UserStorageBackendError e) = object [ "code" .= toJSON e ]
   toJSON NoSuchCommandError          = object [ "code" .= A.String "no_such_command" ]
   toJSON MissingOptionsError         = object [ "code" .= A.String "missing_options" ]
+  toJSON CouldNotSendMailError       = object [ "code" .= A.String "could_not_send_mail" ]
 #ifdef DEBUG
   toJSON InvalidUserError            = object [ "code" .= A.String "invalid_user" ]
   toJSON (ParseError e)              = object [ "code" .= A.String "parse_error", "reason" .= A.String (T.pack e) ]

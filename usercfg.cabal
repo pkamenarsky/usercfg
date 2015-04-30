@@ -49,6 +49,7 @@ executable user-cfg
                        crypto-pubkey-types,
                        cryptohash,
                        either,
+                       http-conduit,
                        lrucache,
                        mtl,
                        OneTuple,

@@ -3,6 +3,7 @@
 module Commands where
 
 import           Control.Applicative
+import           Control.Exception
 import           Control.Monad.Trans.Maybe
 import           Control.Monad.IO.Class
 
@@ -18,6 +19,7 @@ import qualified Data.Text.Encoding         as TE
 import           Data.Tuple.OneTuple
 
 import qualified Network.Sendgrid.Api       as SG
+import qualified Network.HTTP.Conduit       as NC
 
 import           System.Environment
 
@@ -29,7 +31,7 @@ import           Command
 cmdResetPassword :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
 cmdResetPassword = cmd "reset-password" "Send email with reset token" False
   (OneTuple userOption) $ \username bck -> do
-    runMaybeT $ do
+    res <- runMaybeT $ do
       userId <- MaybeT $ getUserIdByName bck username
       user   <- MaybeT $ getUserById bck userId :: MaybeT IO (User UserData)
       token  <- MaybeT $ Just <$> requestPasswordReset bck userId 1000000
@@ -42,16 +44,21 @@ cmdResetPassword = cmd "reset-password" "Send email with reset token" False
       sgSubj <- MaybeT $ lookupEnv "SG_SUBJ"
       sgText <- MaybeT $ lookupEnv "SG_TEXT"
 
-      liftIO $ SG.sendEmail (SG.Authentication sgUser sgPass)
-        $ SG.EmailMessage
-          { to      = T.unpack $ u_email user
-          , from    = sgFrom
-          , subject = sgSubj
-          , text    = intercalate ( T.unpack $ unPasswordResetToken token )
-                                  $ splitOn "$TOKEN" sgText
-          }
+      let hnd :: NC.HttpException -> IO Response
+          hnd _ = return $ responseFail CouldNotSendMailError
 
-    return responseOk
+          send = SG.sendEmail (SG.Authentication sgUser sgPass)
+                 $ SG.EmailMessage
+                   { to      = T.unpack $ u_email user
+                   , from    = sgFrom
+                   , subject = sgSubj
+                   , text    = intercalate ( T.unpack $ unPasswordResetToken token )
+                                           $ splitOn "$TOKEN" sgText
+                   }
+
+      liftIO $ handle hnd (send >> return responseOk)
+
+    return $ fromMaybe (responseFail CouldNotSendMailError) res
 
 cmdApplyPassword :: UserStorageBackend bck => (T.Text, Command bck (IO Response))
 cmdApplyPassword = cmd "apply-password" "Set password using token requested by reset-password" False
