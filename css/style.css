@@ -1,8 +1,45 @@
+@font-face {
+    font-family: 'DIN';
+    src: url('../resource/DIN Alternate.ttf');
+}
+
 body {
   background-color: #fdf6e5;
+  font-family: "DIN";
+  font-size: 1.6em;
 }
 
 pre {
   white-space: normal;
   margin-top: 0;
+}
+
+h5, p {
+  margin-bottom: 3.6rem;
+}
+
+h5 {
+  font-size: 2.4rem;
+}
+
+.logo {
+  margin-bottom: 1.2rem;
+}
+
+p.header {
+  font-size: 1.5rem;
+  margin-bottom: 1.2rem;
+  margin-left: -2.4rem;
+}
+
+p.header span {
+  margin-left: 1rem;
+}
+
+p.code {
+  margin-bottom: 0.6rem;
+}
+
+p.desc {
+  font-size: 1.4rem;
 }

@@ -15,7 +15,8 @@
 
   <!-- FONT
   –––––––––––––––––––––––––––––––––––––––––––––––––– -->
-  <link href='http://fonts.googleapis.com/css?family=Roboto:300' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+  <!-- <link href='http://fonts.googleapis.com/css?family=Roboto:300' rel='stylesheet' type='text/css'> -->
 
   <!-- CSS
   –––––––––––––––––––––––––––––––––––––––––––––––––– -->
@@ -34,10 +35,9 @@
   –––––––––––––––––––––––––––––––––––––––––––––––––– -->
   <div class="container">
     <div class="row">
-      <div class="twelve columns" style="margin-top: 10%">
-        <h2 style="margin-left: -0.84em">$ usercfg</h2>
-        <!-- <h5>account management for developers</h5> -->
-        <p> usercfg is an account management tool for developers.
+      <div class="twelve-columns" style="margin-top: 10%">
+        <image class="logo" src="resource/logo.png"></image>
+        <h5>usercfg &mdash; account configuration protocol for developers</h5>
         <p> Given a server implementing the specification, it offers easy and passwordless command-line management of multiple accounts on multiple sites.
             The flexible protocol allows for all needed account managament commands without restriction.
         </p>
@@ -46,55 +46,29 @@
       </div>
     </div>
 
-    <!-- INSTALL header
+    <!-- Example
     –––––––––––––––––––––––––––––––––––––––––––––––––– -->
     <div class="row">
-      <div class="twelve columns" style="margin-top: 3%">
-        <h5>INSTALL</h5>
-        <pre>curl https://pkamenarsky.github.io/usercfg/install.sh | /bin/bash</pre>
-      </div>
-    </div>
-
-    <!-- EXAMPLES header
-    –––––––––––––––––––––––––––––––––––––––––––––––––– -->
-    <div class="row">
-      <div class="twelve columns" style="margin-top: 3%">
-        <h5>EXAMPLES</h5>
+      <div class="twelve columns">
+        <p class="header"><i class="fa fa-download"></i><span>INSTALL</span></p>
+        <p>curl https://pkamenarsky.github.io/usercfg/install.sh | /bin/bash</p>
       </div>
     </div>
 
     <!-- Example
     –––––––––––––––––––––––––––––––––––––––––––––––––– -->
     <div class="row">
-      <div class="six columns">
-        <pre>usercfg example.com create-user -n NAME -e EMAIL --ssh-key</pre>
-      </div>
-      <div class="six columns">
-        <p>Create a new user. --ssh-key allows for the automatic upload of the user's public ssh key.</p>
-      </div>
-    </div>
-
-    <!-- Example
-    –––––––––––––––––––––––––––––––––––––––––––––––––– -->
-    <div class="row">
-      <div class="six columns">
-        <pre>usercfg example.com request-password -n NAME</pre>
-      </div>
-      <div class="six columns">
-        <p>Request a password reset token to the email address registered by the user.</p>
+      <div class="twelve columns">
+        <p class="header"><i class="fa fa-quote-left"></i><span>EXAMPLES</span></p>
+        <p class="code">$ usercfg example.com create-user -n NAME -e EMAIL --ssh-key</p>
+        <p class="desc">Create a new user. --ssh-key allows for the automatic upload of the user's public ssh key.</p>
+        <p class="code">$ usercfg example.com request-password -n NAME</p>
+        <p class="desc">Request a password reset token to the email address registered by the user.</p>
+        <p class="code">$ usercfg example.com add-payment -n NAME -t monthly --plan silver</p>
+        <p class="desc">Add a payment plan to the user's account.</p>
       </div>
     </div>
 
-    <!-- Example
-    –––––––––––––––––––––––––––––––––––––––––––––––––– -->
-    <div class="row">
-      <div class="six columns">
-        <pre>usercfg example.com add-payment -n NAME -t monthly --plan silver </pre>
-      </div>
-      <div class="six columns">
-        <p>Add a payment plan to the user's account.</p>
-      </div>
-    </div>
 
     <!-- Footer whitespace
     –––––––––––––––––––––––––––––––––––––––––––––––––– -->
