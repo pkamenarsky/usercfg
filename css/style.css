@@ -38,6 +38,7 @@ p.header span {
 
 p.code {
   margin-bottom: 0.6rem;
+  word-wrap: break-word;
 }
 
 p.desc {
