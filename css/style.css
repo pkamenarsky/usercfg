@@ -29,7 +29,7 @@ h5 {
 p.header {
   font-size: 1.5rem;
   margin-bottom: 1.2rem;
-  margin-left: -2.4rem;
+  /* margin-left: -2.4rem; */
 }
 
 p.header span {
