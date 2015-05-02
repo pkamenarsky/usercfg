@@ -38,10 +38,9 @@
       <div class="twelve-columns" style="margin-top: 10%">
         <image class="logo" src="resource/logo.png"></image>
         <h5>usercfg &mdash; account configuration protocol for developers</h5>
-        <p> Given a server implementing the <a href="https://github.com/pkamenarsky/usercfg/wiki/Protocol">protocol</a>, usercfg offers easy and passwordless command-line management of multiple accounts on multiple sites.
-            A flexible specification allows for all needed account configuration commands without restriction.
+        <p> Given a server implementing the open <a href="https://github.com/pkamenarsky/usercfg/wiki/Protocol">protocol</a>, usercfg offers easy and passwordless command-line management of multiple accounts on multiple sites.
         </p>
-        <p> For more information, check out the <a href="https://github.com/pkamenarsky/usercfg">GitHub project page</a>.
+        <p> For more information check out the <a href="https://github.com/pkamenarsky/usercfg">GitHub project page</a>.
         </p>
       </div>
     </div>
@@ -62,7 +61,7 @@
       <div class="twelve columns">
         <p class="header"><i class="fa fa-quote-left"></i><span>EXAMPLES</span></p>
         <p class="code">$ usercfg example.com create-user -n NAME -e EMAIL --ssh-key</p>
-        <p class="desc">Create a new user. --ssh-key allows for the automatic upload of the user's public ssh key.</p>
+        <p class="desc">Create a new user. --ssh-key automatically uploads the user's public ssh key.</p>
         <p class="code">$ usercfg example.com request-password -n NAME</p>
         <p class="desc">Request a password reset token to the email address registered by the user.</p>
         <p class="code">$ usercfg example.com add-payment -n NAME -t monthly --plan silver</p>
