@@ -1,6 +1,11 @@
 @font-face {
-    font-family: 'DIN';
+    font-family: "DIN";
     src: url('../resource/DIN Alternate.ttf');
+}
+
+@font-face {
+    font-family: "DINM";
+    src: url('../resource/DIN Alternate Medium.ttf');
 }
 
 body {
@@ -38,9 +43,9 @@ p.header span {
 }
 
 p.code {
+  font-family: "DINM";
   margin-bottom: 0.6rem;
   word-wrap: break-word;
-  border-bottom: solid 1px #aaa;
 }
 
 p.desc {
