@@ -40,6 +40,7 @@ p.header span {
 p.code {
   margin-bottom: 0.6rem;
   word-wrap: break-word;
+  border-bottom: solid 1px #aaa;
 }
 
 p.desc {
