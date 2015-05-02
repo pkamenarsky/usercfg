@@ -23,7 +23,7 @@ flag devel
   description: enable development mode (i.e. disable -Werror)
   default: False
 
-executable user-cfg
+executable usercfg-server
   if flag(debug)
     cpp-options: -DDEBUG
 
