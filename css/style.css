@@ -10,7 +10,7 @@
 
 body {
   background-color: #fdf6e5;
-  font-family: "DIN";
+  font-family: "DIN", "Roboto";
   font-size: 1.6em;
 }
 
@@ -43,7 +43,8 @@ p.header span {
 }
 
 p.code {
-  font-family: "DINM";
+  font-family: "DINM", "Roboto";
+  font-weight: 500;
   margin-bottom: 0.6rem;
   word-wrap: break-word;
 }
