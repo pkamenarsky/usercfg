@@ -1,11 +1,11 @@
 @font-face {
     font-family: "DIN";
-    src: url('../resource/DIN Alternate.ttf');
+    src: url('../fonts/DIN Alternate.ttf');
 }
 
 @font-face {
     font-family: "DINM";
-    src: url('../resource/DIN Alternate Medium.ttf');
+    src: url('../fonts/DIN Alternate Medium.ttf');
 }
 
 .title {
@@ -48,7 +48,7 @@ h5, p {
 }
 
 h5 {
-  font-size: 2.4rem;
+  font-size: 2.1rem;
 }
 
 .logo {
