@@ -22,27 +22,6 @@ Otherwise, just do what the script does
     sudo curl https://raw.githubusercontent.com/pkamenarsky/usercfg/master/client/usercfg > /usr/local/bin/usercfg
     sudo chmod +x /usr/local/bin/usercfg
 
-## Examples
-
-    usercfg example.com create-user --name NAME --email EMAIL --ssh-key
-
-creates a user on the site `example.com`. Automatically uploads the user's public ssh key. A shorter version would be:
-
-    usercfg example.com create-user -n NAME -e EMAIL -S
-
-To update a user's email:
-
-    usercfg example.com update-user -n NAME -e NEW-EMAIL
-
-To request a password reset token:
-
-    usercfg example.com reset-password -n NAME
-
-To enter a new password after receiving a mail with the password reset token:
-
-    usercfg example.com apply-password -n NAME -t TOKEN
-
-
 # Server installation
 
 Install the [Haskell platform](https://www.haskell.org/platform). Then
@@ -68,7 +47,29 @@ If you want to use SendGrid for password reset requests, you'll also need to set
 * `SG_SUBJ` - Subject line
 * `SG_TEXT` - Email text, use `$TOKEN` as a placeholder for the password reset token
 
-After setting all needed variables, start PostgresSQL and then launch `~/.cabal/bin/usercfg-server`
+After setting all needed variables, start PostgresSQL and then type
+
+    cabal run
+
+## Examples
+
+    usercfg localhost:8000 create-user --name NAME --email EMAIL --ssh-key
+
+creates a user on the site `example.com`. Automatically uploads the user's public ssh key. A shorter version would be:
+
+    usercfg localhost:8000 create-user -n NAME -e EMAIL -S
+
+To update a user's email:
+
+    usercfg localhost:8000 update-user -n NAME -e NEW-EMAIL
+
+To request a password reset token:
+
+    usercfg localhost:8000 reset-password -n NAME
+
+To enter a new password after receiving a mail with the password reset token:
+
+    usercfg localhost:8000 apply-password -n NAME -t TOKEN
 
 # Deploy to Heroku
 
