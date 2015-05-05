@@ -55,7 +55,7 @@ After setting all needed variables, start PostgresSQL and then type
 
     usercfg localhost:8000 create-user --name NAME --email EMAIL --ssh-key
 
-creates a user on the site `example.com`. Automatically uploads the user's public ssh key. A shorter version would be:
+creates a user on the site `localhost`. Automatically uploads the user's public ssh key. A shorter version would be:
 
     usercfg localhost:8000 create-user -n NAME -e EMAIL -S
 
