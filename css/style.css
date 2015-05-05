@@ -8,8 +8,31 @@
     src: url('../resource/DIN Alternate Medium.ttf');
 }
 
+.title {
+  width: 100%;
+  color: #eee;
+  background-color: #333;
+}
+
+.logo {
+  background-image: url('../resource/logo.png');
+  width: 128px;
+  height: 128px;
+  margin-left: -32px;
+  float: left;
+}
+
+.logo-title {
+  height: 128px;
+  vertical-align: middle;
+  display: table-cell;
+  padding-left: 8px;
+  font-weight: 100;
+}
+
 body {
-  background-color: #fdf6e5;
+  /* background-color: #fdf6e5; */
+  background-color: #eee;
   font-family: "DIN", "Roboto";
   font-size: 1.6em;
 }
