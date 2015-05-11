@@ -10,8 +10,8 @@
 
 .title {
   width: 100%;
-  color: #eee;
-  background-color: #333;
+  /* color: #eee; */
+  /* background-color: #333; */
 }
 
 .logo {
@@ -26,13 +26,13 @@
   height: 128px;
   vertical-align: middle;
   display: table-cell;
-  padding-left: 8px;
+  padding-left: 16px;
   font-weight: 100;
 }
 
 body {
   /* background-color: #fdf6e5; */
-  background-color: #eee;
+  background-color: #fcfcfc;
   font-family: "DIN", "Roboto";
   font-size: 1.6em;
 }
